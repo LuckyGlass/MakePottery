@@ -1,8 +1,8 @@
 import glob
 from torch.utils.data import Dataset
 import numpy as np
-import pyvox.parser
-
+# import pyvox.parser
+from .pyvox import parser
 ## Implement the Voxel Dataset Class
 
 ### Notice:

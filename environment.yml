@@ -120,7 +120,7 @@ dependencies:
     - sympy==1.11.1
     - tenacity==8.2.2
     - torch==2.0.1
-    - torchvision==0.15.2a0
+    - torchvision==0.15.2
     - tornado==6.3.2
     - urllib3==1.26.16
     - wheel==0.38.4
