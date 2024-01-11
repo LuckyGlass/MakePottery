@@ -2,7 +2,6 @@ import os
 import glob
 from torch.utils.data import Dataset
 import numpy as np
-# import pyvox.parser
 from .pyvox.parser import VoxParser
 ## Implement the Voxel Dataset Class
 
@@ -49,9 +48,8 @@ class FragmentDataset(Dataset):
         self.vox_type = vox_type
         self.dim_size = dim_size
         self.transform = transform
-        self.vox_files = sorted(glob.glob(os.path.join(vox_path, "*.vox")))
+        self.vox_files = sorted(glob.glob(os.path.join(vox_path, "*", "*.vox")))
         
-
     def __len__(self):
         # may return len(self.vox_files)
         # TODO
@@ -108,8 +106,8 @@ class FragmentDataset(Dataset):
         # 3. you may optionally get label from path (label hints the type of the pottery, e.g. a jar / vase / bowl etc.)
         # 4. receive fragment voxel and fragment id 
         # 5. then if self.transform: call transformation function vox & frag
-        label = os.path.basename(self.vox_path)
-        img_path = np.random.choice(self.vox_files)
+        img_path = self.vox_files[idx]
+        label = os.path.basename(os.path.dirname(img_path))
         vox = self.__read_vox__(img_path)
         frag = np.copy(vox)
         frag, select_frag = self.__select_fragment__(frag)
@@ -121,8 +119,8 @@ class FragmentDataset(Dataset):
     def __getitem_specific_frag__(self, idx, select_frag):
         # TODO
         # implement by yourself, similar to __getitem__ but designate frag_id
-        label = os.path.basename(self.vox_path)
-        img_path = np.random.choice(self.vox_files)
+        img_path = self.vox_files[idx]
+        label = os.path.basename(os.path.dirname(img_path))
         vox = self.__read_vox__(img_path)
         frag = np.copy(vox)
         frag, select_frag = self.__select_fragment_specific__(frag, select_frag)
