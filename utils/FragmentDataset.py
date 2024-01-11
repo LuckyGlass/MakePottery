@@ -62,8 +62,10 @@ class FragmentDataset(Dataset):
         # you may utilize self.dim_size
         # return numpy.ndrray type with shape of res*res*res (*1 or * 4) np.array (w/w.o norm vectors)
         # TODO
-        
-        return 
+        model = VoxParser(path).parse()
+        vox = model.to_dense()
+        factor = int(64/self.dim_size)
+        return vox[::factor, ::factor, ::factor]
 
     def __select_fragment__(self, voxel):
         # randomly select one picece in voxel
