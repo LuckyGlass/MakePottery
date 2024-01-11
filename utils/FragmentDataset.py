@@ -1,3 +1,4 @@
+import os
 import glob
 from torch.utils.data import Dataset
 import numpy as np
@@ -44,18 +45,24 @@ class FragmentDataset(Dataset):
         # self.vox_files is a list consists all file names (can use sorted() method and glob.glob())
         # please delete the "return" in __init__
         # TODO
-        return
+        self.vox_path = vox_path
+        self.vox_type = vox_type
+        self.dim_size = dim_size
+        self.transform = transform
+        self.vox_files = sorted(glob.glob(os.path.join(vox_path, "*.vox")))
+        
 
     def __len__(self):
         # may return len(self.vox_files)
         # TODO
-        return 
+        return len(self.vox_files)
 
     def __read_vox__(self, path):
         # read voxel, transform to specific resolution
         # you may utilize self.dim_size
         # return numpy.ndrray type with shape of res*res*res (*1 or * 4) np.array (w/w.o norm vectors)
         # TODO
+        
         return 
 
     def __select_fragment__(self, voxel):
@@ -63,6 +70,13 @@ class FragmentDataset(Dataset):
         # return selected voxel and the random id select_frag
         # hint: find all voxel ids from voxel, and randomly pick one as fragmented data (hint: refer to function below)
         # TODO
+        frag_id = np.unique(voxel)[1:]
+        select_frag = np.random.choice(frag_id)
+        for f in frag_id:
+            if f == select_frag:
+                voxel[voxel == f] = 1
+            else:
+                voxel[voxel == f] = 0
         return voxel, select_frag
         
     def __non_select_fragment__(self, voxel, select_frag):
