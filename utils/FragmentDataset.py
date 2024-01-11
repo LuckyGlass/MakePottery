@@ -92,6 +92,12 @@ class FragmentDataset(Dataset):
     def __select_fragment_specific__(self, voxel, select_frag):
         # pick designated piece of fragments in voxel
         # TODO
+        frag_id = np.unique(voxel)[1:]
+        for f in frag_id:
+            if f == select_frag:
+                voxel[voxel == f] = 1
+            else:
+                voxel[voxel == f] = 0
         return voxel, select_frag
 
     def __getitem__(self, idx):
