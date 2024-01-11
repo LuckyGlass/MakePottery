@@ -55,7 +55,7 @@ def __read_vox_frag__(path, fragment_idx):
     mask = (vox == fragment_idx)
     return vox * mask
 
-def __read_vox__(path):
+def __read_vox__(path, resolution=64):
     ''' read the .vox file from given path.
         
         Input: path (str)
@@ -73,7 +73,8 @@ def __read_vox__(path):
     # TODO
     model = VoxParser(path).parse()
     vox = model.to_dense()
-    return vox
+    factor = int(64/resolution)
+    return vox[::factor, ::factor, ::factor]
 
 
 def plot(voxel_matrix, save_dir):
@@ -92,7 +93,7 @@ def plot(voxel_matrix, save_dir):
     '''
     voxels = np.array(np.where(voxel_matrix)).T
     x, y, z = voxels[:, 0], voxels[:, 1], voxels[:, 2]
-    fig = go.Figure(data=go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=\
+    fig = go.Figure(data=go.Scatter3d(x=x, y=y, z=-z, mode='markers', marker=\
                     dict(size=5, symbol='square', color='#ceabb2', line=dict(width=2,color='DarkSlateGrey',))))
     fig.update_layout()
     fig.write_image(os.path.join(save_dir, "plot.png"))
@@ -122,7 +123,7 @@ def plot_frag(vox_pottery, save_dir):
     for i in range(1, 12):
         voxels = np.array(np.where(vox_pottery == i)).T
         x, y, z = voxels[:, 0], voxels[:, 1], voxels[:, 2]
-        scatter = go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=5, symbol='square', color=colors[i % len(colors)], line=dict(width=2,color='DarkSlateGrey',)))
+        scatter = go.Scatter3d(x=x, y=y, z=-z, mode='markers', marker=dict(size=5, symbol='square', color=colors[i % len(colors)], line=dict(width=2,color='DarkSlateGrey',)))
         data.append(scatter)
     fig = go.Figure(data)
     fig.update_layout()
