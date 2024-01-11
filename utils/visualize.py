@@ -1,6 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
-import pyvox.parser
+from .pyvox.parser import *
 ## Complete Visualization Functions for Pottery Voxel Dataset
 '''
 **Requirements:**
