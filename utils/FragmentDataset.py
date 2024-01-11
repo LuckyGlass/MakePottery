@@ -3,7 +3,7 @@ import glob
 from torch.utils.data import Dataset
 import numpy as np
 # import pyvox.parser
-from .pyvox import parser
+from .pyvox.parser import VoxParser
 ## Implement the Voxel Dataset Class
 
 ### Notice:
@@ -71,9 +71,9 @@ class FragmentDataset(Dataset):
         # hint: find all voxel ids from voxel, and randomly pick one as fragmented data (hint: refer to function below)
         # TODO
         frag_id = np.unique(voxel)[1:]
-        select_frag = np.random.choice(frag_id)
+        select_frag = [np.random.choice(frag_id)]
         for f in frag_id:
-            if f == select_frag:
+            if f in select_frag:
                 voxel[voxel == f] = 1
             else:
                 voxel[voxel == f] = 0
@@ -106,13 +106,28 @@ class FragmentDataset(Dataset):
         # 3. you may optionally get label from path (label hints the type of the pottery, e.g. a jar / vase / bowl etc.)
         # 4. receive fragment voxel and fragment id 
         # 5. then if self.transform: call transformation function vox & frag
-
-        return frag, vox,  # select_frag, int(label)-1#, img_path
+        label = os.path.dirname(self.vox_path)
+        img_path = np.random.choice(self.vox_files)
+        vox = self.__read_vox__(img_path)
+        frag = np.copy(vox)
+        frag, select_frag = self.__select_fragment__(frag)
+        if self.transform is not None:
+            vox = self.transform(vox)
+            frag = self.transform(frag)
+        return frag, vox, select_frag, int(label)-1, img_path
 
     def __getitem_specific_frag__(self, idx, select_frag):
         # TODO
         # implement by yourself, similar to __getitem__ but designate frag_id
-        return frag, vox,  # select_frag, int(label)-1, img_path
+        label = os.path.dirname(self.vox_path)
+        img_path = np.random.choice(self.vox_files)
+        vox = self.__read_vox__(img_path)
+        frag = np.copy(vox)
+        frag, select_frag = self.__select_fragment_specific__(frag, select_frag)
+        if self.transform is not None:
+            vox = self.transform(vox)
+            frag = self.transform(frag)
+        return frag, vox, select_frag, int(label)-1, img_path
 
     def __getfractures__(self, idx):
         img_path = self.vox_files[idx]
