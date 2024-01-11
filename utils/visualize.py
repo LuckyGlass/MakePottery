@@ -94,7 +94,7 @@ def plot(voxel_matrix, save_dir):
     fig = go.Figure(data=go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=\
                     dict(size=5, symbol='square', color='#ceabb2', line=dict(width=2,color='DarkSlateGrey',))))
     fig.update_layout()
-    fig.write_image(save_dir+".png")
+    fig.write_image(save_dir+"/plot.png")
     fig.show()
     
 
@@ -125,7 +125,7 @@ def plot_frag(vox_pottery, save_dir):
         data.append(scatter)
     fig = go.Figure(data)
     fig.update_layout()
-    # fig.write_html(save_dir + "/plot_frag.html")
+    fig.write_image(save_dir + "/plot_frag.png")
     fig.show()
 
 
