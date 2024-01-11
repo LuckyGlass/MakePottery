@@ -108,7 +108,7 @@ class FragmentDataset(Dataset):
         # 3. you may optionally get label from path (label hints the type of the pottery, e.g. a jar / vase / bowl etc.)
         # 4. receive fragment voxel and fragment id 
         # 5. then if self.transform: call transformation function vox & frag
-        label = os.path.dirname(self.vox_path)
+        label = os.path.basename(self.vox_path)
         img_path = np.random.choice(self.vox_files)
         vox = self.__read_vox__(img_path)
         frag = np.copy(vox)
@@ -121,7 +121,7 @@ class FragmentDataset(Dataset):
     def __getitem_specific_frag__(self, idx, select_frag):
         # TODO
         # implement by yourself, similar to __getitem__ but designate frag_id
-        label = os.path.dirname(self.vox_path)
+        label = os.path.basename(self.vox_path)
         img_path = np.random.choice(self.vox_files)
         vox = self.__read_vox__(img_path)
         frag = np.copy(vox)
