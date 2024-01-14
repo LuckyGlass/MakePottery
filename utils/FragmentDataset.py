@@ -1,5 +1,6 @@
 import os
 import glob
+import torch
 from torch.utils.data import Dataset
 import numpy as np
 from .pyvox.parser import VoxParser
@@ -60,8 +61,17 @@ class FragmentDataset(Dataset):
         # you may utilize self.dim_size
         # return numpy.ndrray type with shape of res*res*res (*1 or * 4) np.array (w/w.o norm vectors)
         # TODO
-        model = VoxParser(path).parse()
-        vox = model.to_dense()
+        vox = torch.from_numpy(VoxParser(path).parse().to_dense())
+        assert vox.shape[0] <= 64 and vox.shape[1] <= 64 and vox.shape[2] <= 64
+        if vox.shape[0] != 64:
+            temp = torch.zeros((64 - vox.shape[0], vox.shape[1], vox.shape[2]))
+            vox = torch.concat([vox, temp], dim=0)
+        if vox.shape[1] != 64:
+            temp = torch.zeros((64, 64 - vox.shape[1], vox.shape[2]))
+            vox = torch.concat([vox, temp], dim=1)
+        if vox.shape[2] != 64:
+            temp = torch.zeros((64, 64, 64 - vox.shape[2]))
+            vox = torch.concat([vox, temp], dim=2)
         factor = int(64/self.dim_size)
         return vox[::factor, ::factor, ::factor]
 
@@ -73,7 +83,7 @@ class FragmentDataset(Dataset):
         frag_id = np.unique(voxel)[1:]
         # Decide the number of fragments, at least one and not all.
         select_num = np.random.choice(np.arange(1, len(frag_id)))
-        select_frag = [np.random.choice(frag_id, select_num)]
+        select_frag = np.random.choice(frag_id, select_num)
         for f in frag_id:
             if f in select_frag:
                 voxel[voxel == f] = 1
@@ -116,7 +126,9 @@ class FragmentDataset(Dataset):
         if self.transform is not None:
             vox = self.transform(vox)
             frag = self.transform(frag)
-        return frag, vox, select_frag, int(label)-1, img_path
+        select_frag_embed = torch.zeros(20)
+        select_frag_embed[select_frag] = 1
+        return frag, vox, select_frag_embed, int(label)-1, img_path
 
     def __getitem_specific_frag__(self, idx, select_frag):
         # TODO
@@ -129,7 +141,9 @@ class FragmentDataset(Dataset):
         if self.transform is not None:
             vox = self.transform(vox)
             frag = self.transform(frag)
-        return frag, vox, select_frag, int(label)-1, img_path
+        select_frag_embed = torch.zeros(20)
+        select_frag_embed[select_frag] = 1
+        return frag, vox, select_frag_embed, int(label)-1, img_path
 
     def __getfractures__(self, idx):
         img_path = self.vox_files[idx]
