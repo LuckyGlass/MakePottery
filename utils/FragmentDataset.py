@@ -66,12 +66,14 @@ class FragmentDataset(Dataset):
         return vox[::factor, ::factor, ::factor]
 
     def __select_fragment__(self, voxel):
-        # randomly select one picece in voxel
+        # randomly select several pieces(not all) in voxel
         # return selected voxel and the random id select_frag
         # hint: find all voxel ids from voxel, and randomly pick one as fragmented data (hint: refer to function below)
         # TODO
         frag_id = np.unique(voxel)[1:]
-        select_frag = [np.random.choice(frag_id)]
+        # Decide the number of fragments, at least one and not all.
+        select_num = np.random.choice(np.arange(1, len(frag_id)))
+        select_frag = [np.random.choice(frag_id, select_num)]
         for f in frag_id:
             if f in select_frag:
                 voxel[voxel == f] = 1
