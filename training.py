@@ -22,6 +22,11 @@ import click
 import argparse
 from test import *
 
+
+def loss():
+    pass
+
+
 def main():
     ### Here is a simple demonstration argparse, you may customize your own implementations, and
     # your hyperparam list MAY INCLUDE:
@@ -39,36 +44,79 @@ def main():
     # 12. device!
     # .... (maybe there exists more hyperparams to be appointed)
     
-    parser = argparse.ArgumentParser(description='An example script with command-line arguments.')
-    #TODO (TO MODIFY, NOT CORRECT)
-    # 添加一个命令行参数
-    parser.add_argument('--input_file', type=str, help='Path to the input file.')
-    # TODO
-    # 添加一个可选的布尔参数
-    parser.add_argument('--verbose', action='store_true', help='Enable verbose mode.')
-    # TODO
-    # 解析命令行参数
+    # Fix random seed.
+    torch.manual_seed(2024)
+    torch.cuda.manual_seed_all(2024)
+    
+    # Add hyperparameters.
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train_vox_path', type=str, help="The path of the training dir.")
+    parser.add_argument('--test_vox_path', type=str, help="The path of the test dir.")
+    parser.add_argument('--hidden_dim', type=int, default=64, help="The hidden dim of GAN, or the resolution.")
+    parser.add_argument('--g_lr', type=float, default=1e-4, help="The learning rate for AdamW of G.")  # Hyperparameters of AdamW for G.
+    parser.add_argument('--g_beta1', type=float, default=0.9, help="Beta1 for AdamW of G.")
+    parser.add_argument('--g_beta2', type=float, default=0.999, help="Beta2 for AdamW of G.")
+    parser.add_argument('--g_eps', type=float, default=1e-8, help="Epsilon for AdamW of G.")
+    parser.add_argument('--g_weight_decay', type=float, default=0.01, help="Weight decay for AdamW of G.")
+    parser.add_argument('--d_lr', type=float, default=1e-4, help="The learning rate for AdamW of D.")  # Hyperparameters of AdamW for D.
+    parser.add_argument('--d_beta1', type=float, default=0.9, help="Beta1 for AdamW of D.")
+    parser.add_argument('--d_beta2', type=float, default=0.999, help="Beta2 for AdamW of D.")
+    parser.add_argument('--d_eps', type=float, default=1e-8, help="Epsilon for AdamW of D.")
+    parser.add_argument('--d_weight_decay', type=float, default=0.01, help="Weight decay for AdamW of D.")
+    parser.add_argument('--batch_size', type=int, default=64, help="The batch size for both training and test.")
+    parser.add_argument('--epochs', type=int, help="Total epochs of training.")
     args = parser.parse_args()
+    # Get available device. (cpu or cuda:0)
+    available_device = "cuda:0" if torch.cuda.is_available() else "cpu"
+ 
+    # Initialize train & test datasets and their dataloaders.
+    train_dataset = FragmentDataset(args.train_vox_path, "train", dim_size=args.hidden_dim)
+    test_dataset = FragmentDataset(args.test_vox_path, "test", dim_size=args.hidden_dim)
+    train_dataloader = data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    test_dataloader = data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
     
-    ### Initialize train and test dataset
-    ## for example,
-    dt = FragmentDataset(dirdataset, 'train')
-    # TODO
-    
-    ### Initialize Generator and Discriminator to specific device
-    ### Along with their optimizers
-    ## for example,
+    # Initialize G & D and their optimizer.
+    G = Generator().to(available_device)
     D = Discriminator().to(available_device)
+    # By default, we use AdamW.
+    G_optim = optim.AdamW(G.parameters(), lr=args.g_lr, betas=(args.g_beta1, args.g_beta2), eps=args.g_eps, weight_decay=args.g_weight_decay)
+    D_optim = optim.AdamW(D.parameters(), lr=args.d_lr, betas=(args.d_beta1, args.d_beta2), eps=args.d_eps, weight_decay=args.d_weight_decay)
+    # Use cross entropy loss.
+    loss_fn = nn.BCELoss()
+
+    # Initialize weights.
     # TODO
-    
-    ### Call dataloader for train and test dataset
-    
+
     ### Implement GAN Loss!!
     # TODO
     
-    ### Training Loop implementation
-    ### You can refer to other papers / github repos for training a GAN
-    # TODO
+    # Training loop.
+    global_step = 0
+    for epoch in range(1, args.epochs + 1):
+        for step, (frags, voxes, frag_ids, labels, paths) in enumerate(train_dataloader):
+            frags = frags.to(available_device)
+            voxes = voxes.to(available_device)
+            global_step += 1
+            # Train G every 5 steps and D every step.
+            if global_step % 5 == 0:
+                D_optim.zero_grad()
+                G_optim.zero_grad()
+                G_pred = G(frags, labels)
+                D_pred_fake = D(G_pred, labels)
+                D_pred_real = D(voxes, labels)
+                D_loss = torch.mean(D_pred_fake) - torch.mean(D_pred_real)
+                # TODO: I think backpropagation on D_loss also updates the gradients of G.
+                D_loss.backward()
+                D_optim.step()
+                G_optim.step()
+            else:
+                D_optim.zero_grad()
+                G_pred = G(frags, labels)
+                D_pred_fake = D(G_pred, labels)
+                D_pred_real = D(voxes, labels)
+                D_loss = torch.mean(D_pred_fake) - torch.mean(D_pred_real)
+                D_loss.backward()
+                D_optim.step()
         # you may call test functions in specific numbers of iterartions
         # remember to stop gradients in testing!
         
@@ -77,4 +125,8 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+
+
+"""
+python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 2
+"""

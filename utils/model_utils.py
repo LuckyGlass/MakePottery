@@ -3,7 +3,7 @@
 # Try to implement some post-processing methds for visual evaluation, Display your generated results
 import numpy as np
 import torch
-from utils.model import Generator, Discriminator
+from model import Generator, Discriminator
 from visualize import *
 
 def posprocessing(fake, mesh_frag):

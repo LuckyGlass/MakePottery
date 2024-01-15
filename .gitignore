@@ -1,1 +1,3 @@
 data/
+utils/__pycache__/
+utils/pyvox/

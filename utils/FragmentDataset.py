@@ -1,8 +1,9 @@
+import os
 import glob
+import torch
 from torch.utils.data import Dataset
 import numpy as np
-import pyvox.parser
-
+from .pyvox.parser import VoxParser
 ## Implement the Voxel Dataset Class
 
 ### Notice:
@@ -44,25 +45,50 @@ class FragmentDataset(Dataset):
         # self.vox_files is a list consists all file names (can use sorted() method and glob.glob())
         # please delete the "return" in __init__
         # TODO
-        return
-
+        self.vox_path = vox_path
+        self.vox_type = vox_type
+        self.dim_size = dim_size
+        self.transform = transform
+        self.vox_files = sorted(glob.glob(os.path.join(vox_path, "*", "*.vox")))
+        
     def __len__(self):
         # may return len(self.vox_files)
         # TODO
-        return 
+        return len(self.vox_files)
 
     def __read_vox__(self, path):
         # read voxel, transform to specific resolution
         # you may utilize self.dim_size
         # return numpy.ndrray type with shape of res*res*res (*1 or * 4) np.array (w/w.o norm vectors)
         # TODO
-        return 
+        vox = torch.from_numpy(VoxParser(path).parse().to_dense())
+        assert vox.shape[0] <= 64 and vox.shape[1] <= 64 and vox.shape[2] <= 64
+        if vox.shape[0] != 64:
+            temp = torch.zeros((64 - vox.shape[0], vox.shape[1], vox.shape[2]))
+            vox = torch.concat([vox, temp], dim=0)
+        if vox.shape[1] != 64:
+            temp = torch.zeros((64, 64 - vox.shape[1], vox.shape[2]))
+            vox = torch.concat([vox, temp], dim=1)
+        if vox.shape[2] != 64:
+            temp = torch.zeros((64, 64, 64 - vox.shape[2]))
+            vox = torch.concat([vox, temp], dim=2)
+        factor = int(64/self.dim_size)
+        return vox[::factor, ::factor, ::factor]
 
     def __select_fragment__(self, voxel):
-        # randomly select one picece in voxel
+        # randomly select several pieces(not all) in voxel
         # return selected voxel and the random id select_frag
         # hint: find all voxel ids from voxel, and randomly pick one as fragmented data (hint: refer to function below)
         # TODO
+        frag_id = np.unique(voxel)[1:]
+        # Decide the number of fragments, at least one and not all.
+        select_num = np.random.choice(np.arange(1, len(frag_id)))
+        select_frag = np.random.choice(frag_id, select_num)
+        for f in frag_id:
+            if f in select_frag:
+                voxel[voxel == f] = 1
+            else:
+                voxel[voxel == f] = 0
         return voxel, select_frag
         
     def __non_select_fragment__(self, voxel, select_frag):
@@ -78,6 +104,12 @@ class FragmentDataset(Dataset):
     def __select_fragment_specific__(self, voxel, select_frag):
         # pick designated piece of fragments in voxel
         # TODO
+        frag_id = np.unique(voxel)[1:]
+        for f in frag_id:
+            if f == select_frag:
+                voxel[voxel == f] = 1
+            else:
+                voxel[voxel == f] = 0
         return voxel, select_frag
 
     def __getitem__(self, idx):
@@ -86,13 +118,32 @@ class FragmentDataset(Dataset):
         # 3. you may optionally get label from path (label hints the type of the pottery, e.g. a jar / vase / bowl etc.)
         # 4. receive fragment voxel and fragment id 
         # 5. then if self.transform: call transformation function vox & frag
-
-        return frag, vox,  # select_frag, int(label)-1#, img_path
+        img_path = self.vox_files[idx]
+        label = os.path.basename(os.path.dirname(img_path))
+        vox = self.__read_vox__(img_path)
+        frag = np.copy(vox)
+        frag, select_frag = self.__select_fragment__(frag)
+        if self.transform is not None:
+            vox = self.transform(vox)
+            frag = self.transform(frag)
+        select_frag_embed = torch.zeros(20)
+        select_frag_embed[select_frag] = 1
+        return frag, vox, select_frag_embed, int(label)-1, img_path
 
     def __getitem_specific_frag__(self, idx, select_frag):
         # TODO
         # implement by yourself, similar to __getitem__ but designate frag_id
-        return frag, vox,  # select_frag, int(label)-1, img_path
+        img_path = self.vox_files[idx]
+        label = os.path.basename(os.path.dirname(img_path))
+        vox = self.__read_vox__(img_path)
+        frag = np.copy(vox)
+        frag, select_frag = self.__select_fragment_specific__(frag, select_frag)
+        if self.transform is not None:
+            vox = self.transform(vox)
+            frag = self.transform(frag)
+        select_frag_embed = torch.zeros(20)
+        select_frag_embed[select_frag] = 1
+        return frag, vox, select_frag_embed, int(label)-1, img_path
 
     def __getfractures__(self, idx):
         img_path = self.vox_files[idx]
