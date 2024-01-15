@@ -96,6 +96,7 @@ def main():
         for step, (frags, voxes, frag_ids, labels, paths) in enumerate(train_dataloader):
             frags = frags.to(available_device)
             voxes = voxes.to(available_device)
+            labels = labels.to(available_device)  # fixed: device bug
             global_step += 1
             # Train G every 5 steps and D every step.
             if global_step % 5 == 0:
