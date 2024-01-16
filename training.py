@@ -63,6 +63,7 @@ class GAN_trainer:
         self.args = parser.parse_args()
         self.args.load_path = None or "models/" + self.args.model_name + ".pt"
         self.args.save_path = None or "models/" + self.args.model_name + ".pt"
+        print(self.args.available_device)
         print("Args Resolved Succesfully")
 
     def load_Model(self):
@@ -204,10 +205,9 @@ def main():
             task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(model.train_dataloader)-1})...",total=len(model.train_dataloader)-1)
 
             for step, (frags, voxes, frag_ids, labels, paths) in enumerate(model.train_dataloader):
-
                 model.args.global_step += 1
-                frags = downSample(frags).to(model.args.available_device)  # fixed: downSample
-                voxes = downSample(voxes).to(model.args.available_device)
+                frags = frags.to(model.args.available_device)
+                voxes = voxes.to(model.args.available_device)
                 labels = labels.to(model.args.available_device)  # fixed: device bug
 
                 if model.args.global_step % 5 == 0:
@@ -215,9 +215,6 @@ def main():
                 model.train_D(voxes,frags,labels)
 
                 progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1})...")
-            
-                if step == 1:
-                    break
 
             progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs})...")
             
@@ -231,5 +228,5 @@ if __name__ == "__main__":
     main()
 
 """
-python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 2
+python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
 """
