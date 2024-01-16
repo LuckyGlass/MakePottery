@@ -95,7 +95,7 @@ class Discriminator32(torch.nn.Module):
         # 2^3 *256-> 1024 
         self.encoderv = torch.nn.Sequential(
             torch.nn.Flatten(),
-            torch.nn.Linear(1024,1024),
+            torch.nn.Linear(2048,1024),
             torch.nn.LeakyReLU(0.2)
         )
         # Encode for label
@@ -119,7 +119,7 @@ class Discriminator32(torch.nn.Module):
         # Do not forget the batch size in x.dim
 
         b = voxel.shape[0]
-        voxel.reshape(b,1,32,32,32)
+        voxel = voxel.reshape(b,1,32,32,32)
         
         # Encode for Voxel
         # 32^3*1  -> 32^3*32
@@ -129,16 +129,16 @@ class Discriminator32(torch.nn.Module):
         assert v1.shape == (b,32,32,32,32)
         v2 = self.encoder2(v1)
         # 16^3*32 -> 8^3 *64
-        assert v.shape == (b,32,16,16,16)
+        assert v2.shape == (b,32,16,16,16)
         v3 = self.encoder3(v2)
         # 8^3 *64 -> 4^3 *128
-        assert v.shape == (b,64,8,8,8)
+        assert v3.shape == (b,64,8,8,8)
         v4 = self.encoder4(v3)
         # 4^3 *128-> 2^3 *256
-        assert v.shape == (b,128,4,4,4)
+        assert v4.shape == (b,128,4,4,4)
         v5 = self.encoder5(v4)
         # 2^3 *256-> 1024 
-        assert v.shape == (b,256,2,2,2)
+        assert v5.shape == (b,256,2,2,2)
         v = self.encoderv(v5)
 
         # Encode for label:1->1024
@@ -149,9 +149,9 @@ class Discriminator32(torch.nn.Module):
         assert l.shape == (b,1024)
         inp = torch.cat((v,l),dim=1)
         assert inp.shape == (b,1024*2)
-        out = self.final(out)
-        out.reshape(b)
-        assert out.shape == (b)
+        out = self.final(inp)
+        out = out.reshape(b)
+        assert out.shape == (b,)
 
         return out
         
@@ -206,7 +206,6 @@ class Generator32(torch.nn.Module):
         self.decoder5 = torch.nn.Sequential(
             torch.nn.ConvTranspose3d(32*2, 1, 5, 1, 2),
             torch.nn.Tanh(),
-            SE(1)
         )
 
     
