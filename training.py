@@ -67,6 +67,10 @@ class GAN_trainer:
         print("Args Resolved Succesfully")
 
     def load_Model(self):
+        self.G = Generator().to(self.args.available_device)  # fixed: define first
+        self.D = Discriminator().to(self.args.available_device)
+        self.G_optim = optim.AdamW(self.G.parameters(), lr=self.args.g_lr, betas=(self.args.g_beta1, self.args.g_beta2), eps=self.args.g_eps, weight_decay=self.args.g_weight_decay)
+        self.D_optim = optim.AdamW(self.D.parameters(), lr=self.args.d_lr, betas=(self.args.d_beta1, self.args.d_beta2), eps=self.args.d_eps, weight_decay=self.args.d_weight_decay)
         try:
             checkpoint = torch.load(self.args.load_path)
             self.G.load_state_dict(checkpoint['model-G'])
@@ -78,12 +82,8 @@ class GAN_trainer:
             self.args = checkpoint['args']
             print(f"Model Loaded from '{self.args.load_path}' Successfully!")
         except:
-            self.G = Generator().to(self.args.available_device)
             self.G_loss = []
-            self.G_optim = optim.AdamW(self.G.parameters(), lr=self.args.g_lr, betas=(self.args.g_beta1, self.args.g_beta2), eps=self.args.g_eps, weight_decay=self.args.g_weight_decay)
-            self.D = Discriminator().to(self.args.available_device)
             self.D_loss = []
-            self.D_optim = optim.AdamW(self.D.parameters(), lr=self.args.d_lr, betas=(self.args.d_beta1, self.args.d_beta2), eps=self.args.d_eps, weight_decay=self.args.d_weight_decay)
             print(f"Model Load Failed from '{self.args.load_path}'! Using New Initialization!")
 
     def load_Data(self):
@@ -118,8 +118,8 @@ class GAN_trainer:
         self.D_loss.append(loss_cpu.to('cpu').detach().numpy())
         loss.backward()
         self.D_optim.step()
-        self.save_Model()
-        self.draw_loss()
+        # self.save_Model()
+        # self.draw_loss()
 
     def train_G(self, voxel_whole, voxel_frag, label):
         voxel_pred = self.G(voxel_frag, label)
@@ -132,7 +132,7 @@ class GAN_trainer:
         self.G_loss.append(loss_cpu.to('cpu').detach().numpy())
         loss.backward()
         self.G_optim.step()
-        self.save_Model()
+        # self.save_Model()
 
     def save_Model(self):
         torch.save({
