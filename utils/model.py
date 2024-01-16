@@ -17,7 +17,7 @@ class SE(torch.nn.Module):
         self.avg_pool = torch.nn.AdaptiveAvgPool3d(1)
         self.fc = torch.nn.Sequential(
             torch.nn.Linear(in_channels, in_channels // reduction_ratio),
-            torch.nn.ReLU(),  # fixed: ReLU -> ReLU()
+            torch.nn.ReLU(True),  # fixed: ReLU -> ReLU()
             torch.nn.Linear(in_channels // reduction_ratio, in_channels),
             torch.nn.Sigmoid()
         )
@@ -47,7 +47,7 @@ class Conv3DforG(torch.nn.Module):
         super(Conv3DforG, self).__init__()
         self.c1 = torch.nn.Conv3d(in_channels, out_channels, kernel_size, stride, padding)
         self.bn = torch.nn.BatchNorm3d(out_channels)
-        self.ac = torch.nn.ReLU()
+        self.ac = torch.nn.ReLU(True)
         self.se = SE(out_channels)
 
     def forward(self, x):
@@ -62,7 +62,7 @@ class TransConv3DforG(torch.nn.Module):
         super(TransConv3DforG, self).__init__()
         self.c1 = torch.nn.ConvTranspose3d(in_channels, out_channels, kernel_size, stride, padding)
         self.bn = torch.nn.BatchNorm3d(out_channels)
-        self.ac = torch.nn.ReLU()
+        self.ac = torch.nn.ReLU(True)
         self.se = SE(out_channels)
 
     def forward(self, x):
@@ -179,7 +179,7 @@ class Generator32(torch.nn.Module):
         self.encoderv = torch.nn.Sequential(
             torch.nn.Flatten(),
             torch.nn.Linear(2048,1024),  # fixed: input_dim 1024 -> 2048
-            torch.nn.ReLU()
+            torch.nn.ReLU(True)
         )
 
         # Encode for label:1->1024
@@ -187,7 +187,7 @@ class Generator32(torch.nn.Module):
             torch.nn.Embedding(11,64),
             torch.nn.Flatten(),
             torch.nn.Linear(64,1024),
-            torch.nn.ReLU()
+            torch.nn.ReLU(True)
         )
 
         # Concat and Transpose
