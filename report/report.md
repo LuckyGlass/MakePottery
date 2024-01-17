@@ -8,7 +8,8 @@
 ## Part2 Related Works
 
 ### (1) GAN based models[wmq]
-introduce a variety of GANs
+
+Basic GAN model[https://arxiv.org/abs/1406.2661] consists of two parts: generator and discriminator. In the first version, both the generator and the discriminator are MLPs. The advanced GANs make many modifications to the model structure, such as using CNNs --- which is called DCGAN[https://arxiv.org/abs/1701.07875], using Varation-AutoEncoder --- which is called VAE-GAN[https://arxiv.org/abs/1406.2661], changing loss function from JS divergence to Wasserstein loss --- which is called WGAN[https://arxiv.org/abs/1701.07875]. These modifications focused on higher ability and better stablity. Another kind of modification concerns how to generate higher resolutions and bigger results. One basic way is to adding new structure and stronger computation, such as SA-GAN[https://arxiv.org/abs/1805.08318] using self-attention, SN-GAN[https://arxiv.org/abs/1802.05957] using spectral normalization, bigGAN[https://arxiv.org/abs/1809.11096] using bigger batch size. Some method changes the way the model works, including using progressive scale-growing GANs, which is called ProGAN[https://arxiv.org/abs/1710.10196]; using progressive pixel-growing models, which is called PixelCNN[https://arxiv.org/abs/1606.05328](this is not a GAN, but a kind of generative model, so we put here). Another improving way is adding controls to the result, such as cGANs[https://arxiv.org/abs/1411.1784], styleGANs[https://arxiv.org/abs/1812.04948].
 
 ### (2) main paper introduction[xly]
 
@@ -30,29 +31,39 @@ It's worth noting that the task is a prediction task, instead of a generation ta
 Our task setting is almost the same as *"3D reconstruction of incomplete archaeological objects using a generative adversarial network" (Hermoza, 2018)*, with a slight difference that the inputs of our tasks were fragments (or combinations of fragments), while in Hermoza (2018)'s work, the inputs were randomly sampled from the complete models.
 
 ### (2) Model Setting[wmq]
+
 model layer structure/hyper parameters/loss function/optimizer/training strategy
 We build a generator32 and a discriminator32 in `utils/model.py` separately and combine them into a GAN in `training.py`. The generator takes the input fragments and the label and outputs the complete model. The discriminator takes the complete model and the label and outputs a score. It should be emphasized that label are needed for both the generator and the discriminator, which means that the GAN model we built is actually a conditional-GAN.
 
 The generator is built as the picture shown: In the first branch we use 1 Encoder (named as encoderl) to convert the label into a 1024 dim feature vector. In the second branch, we use 5 sequentially connected Encoder layers (named encoder_i) to encode the input fragments into a 1024 dim feature vector. Then we concatenate these two convert them into a 1024 dim feature vector. After these step, we use 5 Decoder layers (named as decoder_i) to decode the feature vector into a 3D-voxel, which is the output of the generator. The discriminator is similar in the first two step, and convert the feature vector into a 1 dim feature vector, which is the final output of the discriminator.
 
-<img src='images/model-paper.png' width =300>
+<img src='images/paper1.png' width = 300>
+<img src='images/paper2.png' width = 300>
+<img src='images/paper3.png' width = 300>
+<img src='images/paper3.png' width = 300>
 
     picture in the paper
 
-<img src='images/model-G1.png' width =300>
-<img src='images/model-G2.png' width =300>
-<img src='images/model-G3.png' width =300>
+<img src='images/model-G1.png' width =200>
+<img src='images/model-G2.png' width =200>
+<img src='images/model-G3.png' width =200>
+<img src='images/model-G4.png' width =200>
+<img src='images/model-G5.png' width =200>
 
     generator32 we build
 
-<img src='images/model-D1.png' width =300>
-<img src='images/model-D2.png' width =300>
+<img src='images/model-D1.png' width =200>
+<img src='images/model-D2.png' width =200>
+<img src='images/model-D3.png' width =200>
 
     discriminator32 we build
 
 <img src='images/model-SE.png' width =300>
+<img src='images/model-enc1.png' width =300>
+<img src='images/model-enc2.png' width =300>
+<img src='images/model-dec.png' width =300>
 
-    SE layer we build
+    SE layer/Encoder/Decoder we build
 
 There're 2 points to note in this model: 1. Every encoder follows not only the 'Conv-Act-Norm' paradiam, but also follows a SE-layer. Decoders are the same except for replacing the 'Conv-layer' with 'TransConv-layer'. Details parameters are in the picture. 2. The generator use 'skip connection' technique which means directly concatenanting one feature map with a very late feature map. 
 
@@ -83,7 +94,24 @@ The same complete models were divided into different sets of fragments, which me
 However, it also allowed us to strengthen the dataset by randomly combining the fragments as inputs. We could generate a large number of combinations for each pottary, which contributed to preventing overfitting.
 
 ### (3) Training Framework[wmq]
-introduce codes in training.py(mention this time, won't appear in final report)
+
+We used Pytorch to implement the training framework in training.py, named as `GAN_trainer`, shown in pictures below. In this model, we implements several functions, including args setting, data loading, model loading, model saving, model initialization, G_training, D_training, loss_drawing. In the main function, we initialize the model, load the data, and start the training process. We adapted the popular training way: update D every time and update G every 5 times. For better visualization, we also implemented a color progressing bar in console.
+
+<img src='images/train1.png' width=300>
+<img src='images/train4.png' width=300>
+<img src='images/train2.png' width=300>
+<img src='images/train3.png' width=300>
+
+    class GAN_trainer and some of its member functions
+
+<img src='images/train0.png' width=300>
+<img src='images/train-loss.jpg' width=300>
+
+    left:training process;    right:loss picture in one trial 
+
+<img src='images/train-bar.png' width=400>
+
+    colorful progressing bar in console
 
 ### (4) Remote Environment Setting[xly]
 introduce how to set up environment in remote server(mention this time, won't appear in final report)
