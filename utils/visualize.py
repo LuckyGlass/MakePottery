@@ -120,7 +120,7 @@ def plot_frag(vox_pottery, save_dir):
     '''
     colors = ['#ceabb2', '#d05d86', '#7e1b2f', '#c1375b', '#cdc1c3', '#ceabb2', '#d05d86', '#7e1b2f', '#c1375b', '#cdc1c3']
     data = []
-    for i in range(1, 12):
+    for i in range(1, 20):
         voxels = np.array(np.where(vox_pottery == i)).T
         x, y, z = voxels[:, 0], voxels[:, 1], voxels[:, 2]
         scatter = go.Scatter3d(x=x, y=y, z=-z, mode='markers', marker=dict(size=5, symbol='square', color=colors[i % len(colors)], line=dict(width=2,color='DarkSlateGrey',)))

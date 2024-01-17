@@ -3,7 +3,8 @@
 2024.1.17 成员：xxx, xxx, xxx
 
 ## Part1 Introduction[xly]
-(a brief introduction，such as“我们选择的题目是xxx，经过xxx时间我们目前完成了xxx内容、达到了xxx效果，后续计划完成xxx”)
+The topic we choose for final project is *Let's Make Pottery: GANS for Voxel Completion in Ancient Pottery Dataset* whose Quizmaster is class TA YuXuan, Luo.
+This project mainly revolves around building a GAN that takes fragmented artifacts' voxel representation as input and outputs the missing part of the corresponding piece so as to assist the pottery reconstruction work for archaeological studies. Till the middle checkpoint, we've successfully visualized the dataset, implemented the strengthened data-loader and constructed the structure of a naive GAN which can smoothly compile and train. For further improvement, we plan to train it on a larger basis to collect long-term data of its performance and visualize its output. Eventually we will generalize our model to $64^3$ resolution and derive loss functions utilizing normal vectors and other significant information to improve the reconstruction performance.
 
 ## Part2 Related Works
 
@@ -35,7 +36,16 @@ model layer structure/hyper parameters/loss function/optimizer/training strategy
 ### (1) Visualization[xly]
 introduce what kind of visualization we did(maybe some pictures)
 
-
+We download the `pyvox` utils constituting `pyvox.parser` library from [github repository](https://github.com/gromgull/py-vox-io). 
+With the help of `pyvox parser` and `plotly` library, we've realized the visualization of both the whole voxel object and its chosen fragments and enabled the interaction of a fragmentized voxel object. 
+Furthermore, in order to control the resolution of voxel object, we utilize down-sampling to shrink object size from $64^3$ to $32^3$. For any dimension whose resolution is less than 64, we use concatenation for lengthening. 
+The visualization result is as follows:
+1) visualize the whole object
+![[report/images/plot.png]]
+2) visualize the whole object with each fragment colored separatedly
+![[report/images/plot_frag.png]]
+3) allowing for clicking specific fragment and mopping it off the plot
+![[report/images/newplot.png]]
 ### (2) Data Processing
 #### a) the raw data
 The raw data contained the voxel models of the fragments. The models were not larger than $64\times64\times64$. Each voxel of the models either belonged to a unique fragment or was empty.
@@ -60,4 +70,7 @@ However, it also allowed us to strengthen the dataset by randomly combining the 
 introduce codes in training.py(mention this time, won't appear in final report)
 
 ### (4) Remote Environment Setting[xly]
-introduce how to set up environment in remote server(mention this time, won't appear in final report)
+
+- introduce how to set up environment in remote server
+
+We aim to utilize [Google Colab](https://colab.research.google.com/) for free use of GPU training hours. Currently, we've gone through [this tips for using Colab](https://zhuanlan.zhihu.com/p/666938608) and are trying to adapt our code to fit the requirements of Colab. Major efforts including zipping the dataset to benefit uploading, adding command-line parameters to allow for adjustment of dataset path and model output path, equipping the remote environment to satisfy our dependency needs, adding checkpoint in case of sudden network connection shutdown and so on.
