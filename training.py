@@ -192,15 +192,7 @@ def main():
     
     model = GAN_trainer()
 
-    '''
-    # Initialize weights.
-    # TODO
-
-    # ## Implement GAN Loss!!
-    # TODO
-    '''
     # Training loop.
-
     with Progress() as progress:
         task1 = progress.add_task(f"[red]Epoch Training({0}/{model.args.epochs})...",total=model.args.epochs)
 
@@ -208,6 +200,7 @@ def main():
             task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(model.train_dataloader)-1})...",total=len(model.train_dataloader)-1)
 
             for step, (frags, voxes, frag_ids, labels, paths) in enumerate(model.train_dataloader):
+                
                 model.args.global_step += 1
                 frags = frags.to(model.args.available_device)
                 voxes = voxes.to(model.args.available_device)
