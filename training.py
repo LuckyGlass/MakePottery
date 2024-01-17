@@ -11,6 +11,7 @@
       ACADEMIC INTEGRITY AND ETHIC !!!
 '''
 
+import os
 import numpy as np
 import torch
 from torch import optim
@@ -34,8 +35,13 @@ class GAN_trainer:
     def __init__(self):
         self.init_Args()
         self.load_Data()
-        self.load_Model()
         self.init_Loss()
+        self.G = Generator().to(self.args.available_device)  # fixed: define first
+        self.D = Discriminator().to(self.args.available_device)
+        self.G_optim = optim.AdamW(self.G.parameters(), lr=self.args.g_lr, betas=(self.args.g_beta1, self.args.g_beta2), eps=self.args.g_eps, weight_decay=self.args.g_weight_decay)
+        self.D_optim = optim.AdamW(self.D.parameters(), lr=self.args.d_lr, betas=(self.args.d_beta1, self.args.d_beta2), eps=self.args.d_eps, weight_decay=self.args.d_weight_decay)
+        self.load_Model()
+
         
     def init_Args(self):
     # Add hyperparameters.
@@ -61,16 +67,11 @@ class GAN_trainer:
         parser.add_argument('--save_path', type=str, help="Where to save the model.",default=None)
         parser.add_argument('--global_step', type=int, help="Global step of training.",default=0)
         self.args = parser.parse_args()
-        self.args.load_path = None or "models/" + self.args.model_name + ".pt"
         self.args.save_path = None or "models/" + self.args.model_name + ".pt"
         print(self.args.available_device)
         print("Args Resolved Succesfully")
 
     def load_Model(self):
-        self.G = Generator().to(self.args.available_device)  # fixed: define first
-        self.D = Discriminator().to(self.args.available_device)
-        self.G_optim = optim.AdamW(self.G.parameters(), lr=self.args.g_lr, betas=(self.args.g_beta1, self.args.g_beta2), eps=self.args.g_eps, weight_decay=self.args.g_weight_decay)
-        self.D_optim = optim.AdamW(self.D.parameters(), lr=self.args.d_lr, betas=(self.args.d_beta1, self.args.d_beta2), eps=self.args.d_eps, weight_decay=self.args.d_weight_decay)
         try:
             checkpoint = torch.load(self.args.load_path)
             self.G.load_state_dict(checkpoint['model-G'])
@@ -134,7 +135,9 @@ class GAN_trainer:
         self.G_optim.step()
         # self.save_Model()
 
-    def save_Model(self):
+    def save_Model(self, path=None):
+        if path is None:
+            path = self.args.save_path
         torch.save({
             'model-G':self.G.state_dict(),
             'loss-G':self.G_loss,
@@ -144,8 +147,8 @@ class GAN_trainer:
             'optim-D':self.D_optim.state_dict(),
             'args':self.args
             }, 
-            self.args.save_path)
-        # print(f"Model Saved to {self.args.save_path} Successfully!")
+            path)
+        print(f"Model Saved to {path} Successfully!")
 
     def draw_loss(self):
         plt.figure()
@@ -214,9 +217,21 @@ def main():
                     model.train_G(voxes,frags,labels)
                 model.train_D(voxes,frags,labels)
 
-                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1})...")
+                if len(model.D_loss) == 0:
+                    D_loss = None
+                else:
+                    D_loss = model.D_loss[-1]
+                if len(model.G_loss) == 0:
+                    G_loss = None
+                else:
+                    G_loss = model.G_loss[-1]
+                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1}), loss={(G_loss, D_loss)}...")
 
-            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs})...")
+            D_loss = np.mean(model.D_loss)
+            G_loss = np.mean(model.G_loss)
+            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), loss={(G_loss, D_loss)}...")
+            model.save_Model(os.path.join(".", "models", "GAN32" + str(epoch) + ".pt"))
+            model.draw_loss()
             
             # you may call test functions in specific numbers of iterartions
             # remember to stop gradients in testing!
@@ -228,5 +243,10 @@ if __name__ == "__main__":
     main()
 
 """
-python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
+python training.py \
+    --train_vox_path data/train \
+    --test_vox_path data/test \
+    --epochs 10 \
+    --batch_size 16 \
+    --hidden_dim 32
 """
