@@ -15,7 +15,7 @@ introduce the first two papers mentioned in writeup
 
 ## Part3 Our Approach
 
-### (1) Problem Definition[mys]
+### (1) Problem Definition
 In a word, what we are going to do is to predict models of the complete pottaries, given models of the fragments. The 3D models are represented as voxels of shape $32\times32\times32$ or $64\times64\times64$.
 
 It's worth noting that the task is a prediction task, instead of a generation task. The difference is that in out prediction task, the ground-truths are given, while in a generation task, they are not given. The task determined that our approach was fully-supervised.
@@ -30,8 +30,25 @@ model layer structure/hyper parameters/loss function/optimizer/training strategy
 ### (1) Visualization[xly]
 introduce what kind of visualization we did(maybe some pictures)
 
-### (2) Data Processing[mys]
-introduce how data was processed and how the input and output data was organized
+### (2) Data Processing
+#### a) the raw data
+The raw data contained the voxel models of the fragments. The models were not larger than $64\times64\times64$. Each voxel of the models either belonged to a unique fragment or was empty.
+
+There were $11$ categories of pottaries indexed from $1$ to $11$. Each category contains several pottaries with different shapes, and for each pottary, voxel models of fragments with different number of fragments (at least $2$ and no more than $17$) are given.
+
+#### b) pre-processing
+To stack the voxel data into Torch arrays, we first padded the voxel models to ensure they were of the shape $64\times64\times64$. In detail, we check whether the size of the dimension is less than $64$ for each dimension. If so, we inserted zeros to the back of the dimension.
+
+We implemented two settings. For the low-resolution setting, we downsampled the voxel models by sampling the voxels with even indices (i.e. $0,2,\dots,63$). For the high-resolution setting, we did nothing.
+
+For the training stage, we first shuffled the data. For each voxel model, we randomly selected several pieces of fragments and combined them as the input and took the complete model as the ground-truth. We guaranteed that the input contains at least one piece and not all the pieces.
+
+For the test stage, to make the results stable, we only randomly sampled the pieces for each voxel model in the first epoch. And in the following epochs, we reused the inputs in the first epoch.
+
+#### c) analysis
+The same complete models were divided into different sets of fragments, which meant there were sereral data with the same ground-truths. This might break the property of IID.
+
+However, it also allowed us to strengthen the dataset by randomly combining the fragments as inputs. We could generate a large number of combinations for each pottary, which contributed to preventing overfitting.
 
 ### (3) Training Framework[wmq]
 introduce codes in training.py(mention this time, won't appear in final report)
