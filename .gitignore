@@ -3,3 +3,4 @@ __pycache__/
 utils/__pycache__/
 utils/pyvox/
 models/*.pt
+grad_test.py
