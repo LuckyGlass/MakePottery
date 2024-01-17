@@ -14,7 +14,7 @@ introduce a variety of GANs
 
 - introduce the first two papers mentioned in writeup
 
-Till now, we've read the first two papers mentioned in writeup, namely ***Generative Adversarial Nets*** by Goodfellow and ***3D Reconstruction of Incomplete Archaeological Objects Using Adversarial Network*** by Renato.
+Till now, we've read the first two papers mentioned in writeup, namely *Generative Adversarial Nets* (Goodfellow, 2014) and *3D Reconstruction of Incomplete Archaeological Objects Using Adversarial Network* (Hermoza, 2018) .
 From the first paper, we've learnt the essence of a GAN which is a combination of a generative model G that captures the data distribution, and a discriminative model D that estimates the probability that a sample came from the training data rather than G. We've also gone through the mathematics foundation of the global optimality and convergence of a GAN-based algorithm, from which we derived several training strategies including alternating between the training of D and G. The paper also opens our minds to further improvement of GAN structure such as introducing a variational auto-encoder in the generator to allow for the learning of the conditional variance.
 The second one mainly illustrated a variant of GAN, namely the ORGAN(OR is short for object reconstruction), drawing a fundamental picture of 3D GAN. It gave detailed description regarding its structure(a 3D CNN with **skip-connections**, as a **generator** on a Conditional GAN (CGAN) architecture. With two optimization targets: a mean absolute error (MAE) and an Improved Wasserstein GAN (IWGAN) loss) in additional to training details including the choice of hyper-parameters, which provided us with much reference and experience to rely on. Nevertheless, the dataset we use is quite different from the latter paper, which pushes us to design our own dataloader and consequently the exact training techniques need further experiments.
 
@@ -34,6 +34,7 @@ model layer structure/hyper parameters/loss function/optimizer/training strategy
 
 ### (1) Visualization[xly]
 introduce what kind of visualization we did(maybe some pictures)
+
 
 ### (2) Data Processing
 #### a) the raw data
