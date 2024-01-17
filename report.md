@@ -20,7 +20,7 @@ In a word, what we are going to do is to predict models of the complete pottarie
 
 It's worth noting that the task is a prediction task, instead of a generation task. The difference is that in out prediction task, the ground-truths are given, while in a generation task, they are not given. The task determined that our approach was fully-supervised.
 
-
+Our task setting is almost the same as *"3D reconstruction of incomplete archaeological objects using a generative adversarial network" (Hermoza, 2018)*, with a slight difference that the inputs of our tasks were fragments (or combinations of fragments), while in Hermoza (2018)'s work, the inputs were randomly sampled from the complete models.
 
 ### (2) Model Setting[wmq]
 model layer structure/hyper parameters/loss function/optimizer/training strategy
