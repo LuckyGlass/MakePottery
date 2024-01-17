@@ -275,6 +275,8 @@ class Generator32(torch.nn.Module):
         out = d1.reshape(b,32,32,32)
         assert out.shape == (b,32,32,32)
 
+        voxel = voxel.reshape(-1, 32, 32, 32)
+        out = torch.where(voxel == 1, 1, out)
         return out
     
     

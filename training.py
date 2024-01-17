@@ -249,4 +249,5 @@ python training.py \
     --epochs 10 \
     --batch_size 16 \
     --hidden_dim 32
+python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
 """
