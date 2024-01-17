@@ -43,11 +43,12 @@ With the help of `pyvox parser` and `plotly` library, we've realized the visuali
 Furthermore, in order to control the resolution of voxel object, we utilize down-sampling to shrink object size from $64^3$ to $32^3$. For any dimension whose resolution is less than 64, we use concatenation for lengthening. 
 The visualization result is as follows:
 1) visualize the whole object
-![[report/images/plot.png]]
-2) visualize the whole object with each fragment colored separatedly
-![[report/images/plot_frag.png]]
-3) allowing for clicking specific fragment and mopping it off the plot
-![[report/images/newplot.png]]
+![](images\plot.png)
+1) visualize the whole object with each fragment colored separatedly
+![](images\plot_frag.png)
+1) allowing for clicking specific fragment and mopping it off the plot
+![](images\newplot.png)
+
 ### (2) Data Processing
 #### a) the raw data
 The raw data contained the voxel models of the fragments. The models were not larger than $64\times64\times64$. Each voxel of the models either belonged to a unique fragment or was empty.
