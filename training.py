@@ -234,13 +234,13 @@ def main():
                     G_loss = model.G_losses[-1]
                 progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1}), loss={(G_loss, D_loss)}...")
 
-                D_loss = np.mean(model.D_losses)
-                G_loss = np.mean(model.G_losses)
-                progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), loss={(G_loss, D_loss)}...")
-                pre_title = datetime.datetime.now().strftime("%y%m%d%H%M%S")
-                model.save_Model(os.path.join(".", "drive", "MyDrive", "models", "GAN32" + str(epoch) + "-" + pre_title + ".pt"))
-                model.draw_loss()
-            
+            D_loss = np.mean(model.D_losses)
+            G_loss = np.mean(model.G_losses)
+            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), loss={(G_loss, D_loss)}...")
+            pre_title = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            model.save_Model(os.path.join(".", "drive", "MyDrive", "models", "GAN32" + str(epoch) + "-" + pre_title + ".pt"))
+            model.draw_loss()
+        
             # you may call test functions in specific numbers of iterartions
             # remember to stop gradients in testing!
             # also you may save checkpoints in specific numbers of iterartions
