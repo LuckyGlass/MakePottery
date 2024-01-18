@@ -11,6 +11,7 @@
       ACADEMIC INTEGRITY AND ETHIC !!!
 '''
 
+import datetime
 import os
 import numpy as np
 import torch
@@ -68,23 +69,24 @@ class GAN_trainer:
         parser.add_argument('--global_step', type=int, help="Global step of training.",default=0)
         self.args = parser.parse_args()
         self.args.save_path = None or "models/" + self.args.model_name + ".pt"
-        print(self.args.available_device)
+        self.G_losses = []
+        self.D_losses = []
+        self.D_real_losses = []
+        self.D_fake_losses = []
         print("Args Resolved Succesfully")
 
     def load_Model(self):
         try:
             checkpoint = torch.load(self.args.load_path)
             self.G.load_state_dict(checkpoint['model-G'])
-            self.G_loss = checkpoint['loss-G']
+            self.G_losses = checkpoint['loss-G']
             self.G_optim.load_state_dict(checkpoint['optim-G'])
             self.D.load_state_dict(checkpoint['model-D'])
-            self.D_loss = checkpoint['loss-D']
+            self.D_losses = checkpoint['loss-D']
             self.D_optim.load_state_dict(checkpoint['optim-D'])
             self.args = checkpoint['args']
             print(f"Model Loaded from '{self.args.load_path}' Successfully!")
         except:
-            self.G_loss = []
-            self.D_loss = []
             print(f"Model Load Failed from '{self.args.load_path}'! Using New Initialization!")
 
     def load_Data(self):
@@ -116,7 +118,9 @@ class GAN_trainer:
         loss_grad = self.D_loss3(self.D(voxel_blend,label),voxel_blend)
         loss = loss_real + loss_fake + loss_grad
         loss_cpu = loss
-        self.D_loss.append(loss_cpu.to('cpu').detach().numpy())
+        self.D_losses.append(loss_cpu.to('cpu').detach().numpy())
+        self.D_real_losses.append(loss_real.to('cpu').detach().numpy())
+        self.D_fake_losses.append(loss_fake.to('cpu').detach().numpy())
         loss.backward()
         self.D_optim.step()
         # self.save_Model()
@@ -130,7 +134,7 @@ class GAN_trainer:
         loss_pred = self.G_loss2(self.D(voxel_pred,label))
         loss = loss_diff + loss_pred
         loss_cpu = loss
-        self.G_loss.append(loss_cpu.to('cpu').detach().numpy())
+        self.G_losses.append(loss_cpu.to('cpu').detach().numpy())
         loss.backward()
         self.G_optim.step()
         # self.save_Model()
@@ -153,10 +157,16 @@ class GAN_trainer:
     def draw_loss(self):
         plt.figure()
         plt.plot(self.G_loss)
-        plt.savefig(f"lossPics/{self.args.model_name}-G.jpg")
-        plt.figure()
+        pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
+        plt.savefig(f"lossPics/{pre_title}-G.jpg")
+        plt.cla()
         plt.plot(self.D_loss)
-        plt.savefig(f"lossPics/{self.args.model_name}-D.jpg")
+        plt.savefig(f"lossPics/{pre_title}-D.jpg")
+        plt.cla()
+        plt.plot(self.D_fake_losses)
+        plt.plot(self.D_real_losses)
+        plt.savefig(f"lossPics/{pre_title}-D.jpg")
+        plt.cla()
 
 
 '''1.16-change'''
@@ -210,18 +220,18 @@ def main():
                     model.train_G(voxes,frags,labels)
                 model.train_D(voxes,frags,labels)
 
-                if len(model.D_loss) == 0:
+                if len(model.D_losses) == 0:
                     D_loss = None
                 else:
-                    D_loss = model.D_loss[-1]
-                if len(model.G_loss) == 0:
+                    D_loss = model.D_losses[-1]
+                if len(model.G_losses) == 0:
                     G_loss = None
                 else:
-                    G_loss = model.G_loss[-1]
+                    G_loss = model.G_losses[-1]
                 progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1}), loss={(G_loss, D_loss)}...")
 
-            D_loss = np.mean(model.D_loss)
-            G_loss = np.mean(model.G_loss)
+            D_loss = np.mean(model.D_losses)
+            G_loss = np.mean(model.G_losses)
             progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), loss={(G_loss, D_loss)}...")
             model.save_Model(os.path.join(".", "models", "GAN32" + str(epoch) + ".pt"))
             model.draw_loss()
