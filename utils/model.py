@@ -96,21 +96,21 @@ class Discriminator32(torch.nn.Module):
         self.encoderv = torch.nn.Sequential(
             torch.nn.Flatten(),
             torch.nn.Linear(2048,1024),
-            torch.nn.LeakyReLU(0.2)
+            torch.nn.LeakyReLU(0.2, True)
         )
         # Encode for label
         self.encoderl = torch.nn.Sequential(
             torch.nn.Embedding(11,64),
             torch.nn.Flatten(),
             torch.nn.Linear(64,1024),
-            torch.nn.LeakyReLU(0.2)
+            torch.nn.LeakyReLU(0.2, True)
         )
         self.final = torch.nn.Sequential(
             torch.nn.Linear(1024+1024,512),
-            torch.nn.LeakyReLU(0.2),
-            torch.nn.Linear(512,1)
+            torch.nn.LeakyReLU(0.2, True),
+            torch.nn.Linear(512,1),
+            torch.nn.Tanh(),  # Transform to [-1, 1]
         )
-
     
     
     def forward(self, voxel, label):
@@ -154,8 +154,8 @@ class Discriminator32(torch.nn.Module):
         assert out.shape == (b,)
 
         return out
-        
-    
+
+
 class Generator32(torch.nn.Module):
     # TODO
     def __init__(self):
@@ -196,16 +196,16 @@ class Generator32(torch.nn.Module):
         # Decode
         # 2^3 *256 -> 4^3 *128 
         self.decoder1 = TransConv3DforG(256*2, 128, 4, 2, 1)
-        # 4^3 *128 -> 8^3 *64  
+        # 4^3 *128 -> 8^3 *64
         self.decoder2 = TransConv3DforG(128*2, 64, 4, 2, 1)
-        # 8^3 *64  -> 16^3*32  
+        # 8^3 *64  -> 16^3*32
         self.decoder3 = TransConv3DforG(64*2, 32, 4, 2, 1)
-        # 16^3*32  -> 32^3*32  
+        # 16^3*32  -> 32^3*32
         self.decoder4 = TransConv3DforG(32*2, 32, 4, 2, 1)
-        # 32^3*32  -> 32^3*1   
+        # 32^3*32  -> 32^3*1
         self.decoder5 = torch.nn.Sequential(
             torch.nn.ConvTranspose3d(32*2, 1, 5, 1, 2),
-            torch.nn.Tanh(),
+            torch.nn.Sigmoid(),  # fix: Tanh -> Sigmoid
         )
 
     
