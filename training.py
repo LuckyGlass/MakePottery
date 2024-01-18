@@ -83,6 +83,8 @@ class GAN_trainer:
             self.G_optim.load_state_dict(checkpoint['optim-G'])
             self.D.load_state_dict(checkpoint['model-D'])
             self.D_losses = checkpoint['loss-D']
+            self.D_fake_losses = checkpoint['fake-loss-D']
+            self.D_real_losses = checkpoint['real-loss-D']
             self.D_optim.load_state_dict(checkpoint['optim-D'])
             self.args = checkpoint['args']
             print(f"Model Loaded from '{self.args.load_path}' Successfully!")
@@ -144,12 +146,14 @@ class GAN_trainer:
             path = self.args.save_path
         torch.save({
             'model-G':self.G.state_dict(),
-            'loss-G':self.G_loss,
+            'loss-G':self.G_losses,
             'optim-G':self.G_optim.state_dict(),
             'model-D':self.D.state_dict(),
-            'loss-D':self.D_loss,
+            'loss-D':self.D_losses,
             'optim-D':self.D_optim.state_dict(),
-            'args':self.args
+            'args':self.args,
+            'fake-loss-D':self.D_fake_losses,
+            'real_loss_D':self.D_real_losses
             }, 
             path)
         print(f"Model Saved to {path} Successfully!")
@@ -230,11 +234,12 @@ def main():
                     G_loss = model.G_losses[-1]
                 progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1}), loss={(G_loss, D_loss)}...")
 
-            D_loss = np.mean(model.D_losses)
-            G_loss = np.mean(model.G_losses)
-            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), loss={(G_loss, D_loss)}...")
-            model.save_Model(os.path.join(".", "models", "GAN32" + str(epoch) + ".pt"))
-            model.draw_loss()
+                D_loss = np.mean(model.D_losses)
+                G_loss = np.mean(model.G_losses)
+                progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), loss={(G_loss, D_loss)}...")
+                pre_title = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+                model.save_Model(os.path.join(".", "drive", "MyDrive", "models", "GAN32" + str(epoch) + "-" + pre_title + ".pt"))
+                model.draw_loss()
             
             # you may call test functions in specific numbers of iterartions
             # remember to stop gradients in testing!
