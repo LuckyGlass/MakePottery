@@ -77,7 +77,7 @@ def __read_vox__(path, resolution=64):
     return vox[::factor, ::factor, ::factor]
 
 
-def plot(voxel_matrix, save_dir):
+def plot(voxel_matrix, save_path, if_show=True):
     '''
     plot the whole voxel matrix, without considering the labels (fragments)
     
@@ -96,8 +96,9 @@ def plot(voxel_matrix, save_dir):
     fig = go.Figure(data=go.Scatter3d(x=x, y=y, z=-z, mode='markers', marker=\
                     dict(size=5, symbol='square', color='#ceabb2', line=dict(width=2,color='DarkSlateGrey',))))
     fig.update_layout()
-    fig.write_image(os.path.join(save_dir, "plot.png"))
-    fig.show()
+    fig.write_image(save_path)
+    if if_show:
+        fig.show()
     
 
 
