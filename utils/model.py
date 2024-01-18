@@ -96,6 +96,7 @@ class Discriminator32(torch.nn.Module):
         self.encoderv = torch.nn.Sequential(
             torch.nn.Flatten(),
             torch.nn.Linear(2048,1024),
+            torch.nn.BatchNorm1d(1024),
             torch.nn.LeakyReLU(0.2, True)
         )
         # Encode for label
@@ -103,10 +104,12 @@ class Discriminator32(torch.nn.Module):
             torch.nn.Embedding(11,64),
             torch.nn.Flatten(),
             torch.nn.Linear(64,1024),
+            torch.nn.BatchNorm1d(1024),
             torch.nn.LeakyReLU(0.2, True)
         )
         self.final = torch.nn.Sequential(
             torch.nn.Linear(1024+1024,512),
+            torch.nn.BatchNorm1d(512),
             torch.nn.LeakyReLU(0.2, True),
             torch.nn.Linear(512,1),
             torch.nn.Tanh(),  # Transform to [-1, 1], -1 means real while 1 means fake
@@ -276,8 +279,7 @@ class Generator32(torch.nn.Module):
         assert out.shape == (b,32,32,32)
 
         voxel = voxel.reshape(-1, 32, 32, 32)
-        out = torch.where(voxel == 1, 1, out)
-        # out = voxel + out
+        # out = torch.where(voxel == 1, 1, out)
         return out
     
     
