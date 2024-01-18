@@ -162,14 +162,14 @@ class GAN_trainer:
         plt.figure()
         plt.plot(self.G_losses)
         pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
-        plt.savefig(f"lossPics/{pre_title}-G.jpg")
+        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-G.jpg")
         plt.cla()
         plt.plot(self.D_losses)
-        plt.savefig(f"lossPics/{pre_title}-D.jpg")
+        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D.jpg")
         plt.cla()
         plt.plot(self.D_fake_losses)
         plt.plot(self.D_real_losses)
-        plt.savefig(f"lossPics/{pre_title}-D.jpg")
+        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D.jpg")
         plt.cla()
 
 
