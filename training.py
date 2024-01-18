@@ -69,23 +69,20 @@ class GAN_trainer:
         parser.add_argument('--global_step', type=int, help="Global step of training.",default=0)
         self.args = parser.parse_args()
         self.args.save_path = None or "models/" + self.args.model_name + ".pt"
-        self.G_losses = []
-        self.D_losses = []
-        self.D_real_losses = []
-        self.D_fake_losses = []
         print("Args Resolved Succesfully")
 
     def load_Model(self):
         try:
             checkpoint = torch.load(self.args.load_path)
             self.G.load_state_dict(checkpoint['model-G'])
-            self.G_losses = checkpoint['loss-G']
             self.G_optim.load_state_dict(checkpoint['optim-G'])
             self.D.load_state_dict(checkpoint['model-D'])
-            self.D_losses = checkpoint['loss-D']
-            self.D_fake_losses = checkpoint['fake-loss-D']
-            self.D_real_losses = checkpoint['real-loss-D']
             self.D_optim.load_state_dict(checkpoint['optim-D'])
+            self.D_loss_grad = checkpoint['D_loss_grad']
+            self.D_loss_fake = checkpoint['D_loss_fake']
+            self.D_loss_real = checkpoint['D_loss_real']
+            self.G_loss_pred = checkpoint['G_loss_pred']
+            self.G_loss_diff = checkpoint['G_loss_diff']
             self.args = checkpoint['args']
             print(f"Model Loaded from '{self.args.load_path}' Successfully!")
         except:
@@ -99,11 +96,17 @@ class GAN_trainer:
         print("Data Loaded Successfully!")
 
     def init_Loss(self):
-        self.G_loss1 = nn.L1Loss()
-        self.G_loss2 = lambda y_pred: torch.mean(y_pred)
-        self.D_loss1 = lambda y_pred: torch.mean(y_pred)
-        self.D_loss2 = lambda y_pred: -torch.mean(y_pred)
-        self.D_loss3 = gradient_penalty
+        self.G_loss1 = nn.L1Loss()                          # should converge to 0
+        self.G_loss2 = lambda y_pred: torch.mean(y_pred)    # should converge to ??
+        self.D_loss1 = lambda y_pred: torch.mean(y_pred)    # should converge to ??
+        self.D_loss2 = lambda y_pred: -torch.mean(y_pred)   # should converge to ??
+        self.D_loss3 = gradient_penalty                     # should converge to 0
+        self.D_loss_fake = []
+        self.D_loss_real = []
+        self.D_loss_grad = []
+        self.G_loss_diff = []
+        self.G_loss_pred = []
+
 
     def blend(self, voxel_fake, voxel_real):
         b = voxel_fake.shape[0]
@@ -118,11 +121,14 @@ class GAN_trainer:
         loss_real = self.D_loss1(self.D(voxel_whole,label))
         loss_fake = self.D_loss2(self.D(voxel_pred,label))
         loss_grad = self.D_loss3(self.D(voxel_blend,label),voxel_blend)
+        self.D_loss_fake.append(loss_fake.to('cpu').detach().numpy())
+        self.D_loss_real.append(loss_real.to('cpu').detach().numpy())
+        self.D_loss_grad.append(loss_grad.to('cpu').detach().numpy())
         loss = loss_real + loss_fake + loss_grad
-        loss_cpu = loss
-        self.D_losses.append(loss_cpu.to('cpu').detach().numpy())
-        self.D_real_losses.append(loss_real.to('cpu').detach().numpy())
-        self.D_fake_losses.append(loss_fake.to('cpu').detach().numpy())
+        # loss_cpu = loss
+        # self.D_losses.append(loss_cpu.to('cpu').detach().numpy())
+        # self.D_real_losses.append(loss_real.to('cpu').detach().numpy())
+        # self.D_fake_losses.append(loss_fake.to('cpu').detach().numpy())
         loss.backward()
         self.D_optim.step()
         # self.save_Model()
@@ -134,9 +140,11 @@ class GAN_trainer:
         self.G_optim.zero_grad()
         loss_diff = self.G_loss1(voxel_pred, voxel_whole)
         loss_pred = self.G_loss2(self.D(voxel_pred,label))
+        self.G_loss_diff.append(loss_diff.to('cpu').detach().numpy())
+        self.G_loss_pred.append(loss_pred.to('cpu').detach().numpy())
         loss = loss_diff + loss_pred
-        loss_cpu = loss
-        self.G_losses.append(loss_cpu.to('cpu').detach().numpy())
+        # loss_cpu = loss
+        # self.G_losses.append(loss_cpu.to('cpu').detach().numpy())
         loss.backward()
         self.G_optim.step()
         # self.save_Model()
@@ -146,18 +154,20 @@ class GAN_trainer:
             path = self.args.save_path
         torch.save({
             'model-G':self.G.state_dict(),
-            'loss-G':self.G_losses,
             'optim-G':self.G_optim.state_dict(),
             'model-D':self.D.state_dict(),
-            'loss-D':self.D_losses,
             'optim-D':self.D_optim.state_dict(),
             'args':self.args,
-            'fake-loss-D':self.D_fake_losses,
-            'real_loss_D':self.D_real_losses
+            'G_loss_diff':self.G_loss_diff,
+            'G_loss_pred':self.G_loss_pred,
+            'D_loss_fake':self.D_loss_fake,
+            'D_loss_real':self.D_loss_real,
+            'D_loss_grad':self.D_loss_grad
             }, 
             path)
         print(f"Model Saved to {path} Successfully!")
 
+    '''
     def draw_loss(self):
         pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
         plt.figure()
@@ -173,6 +183,27 @@ class GAN_trainer:
         plt.plot(self.D_real_losses)
         plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-real-D.jpg")
         plt.cla()
+    '''
+
+    def draw_loss(self):
+        pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
+        plt.figure()
+        plt.plot(self.G_loss_pred)
+        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-G_loss_pred.jpg")
+        plt.cla()
+        plt.plot(self.G_loss_diff)
+        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-G_loss_diff.jpg")
+        plt.cla()
+        plt.plot(self.D_loss_fake)
+        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D_loss_fake.jpg")
+        plt.cla()
+        plt.plot(self.D_loss_real)
+        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D_loss_real.jpg")
+        plt.cla()
+        plt.plot(self.D_loss_grad)
+        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D_loss_grad.jpg")
+        plt.cla()
+        
 
 
 '''1.16-change'''
@@ -226,19 +257,23 @@ def main():
                     model.train_G(voxes,frags,labels)
                 model.train_D(voxes,frags,labels)
 
-                if len(model.D_losses) == 0:
-                    D_loss = None
-                else:
-                    D_loss = model.D_losses[-1]
-                if len(model.G_losses) == 0:
-                    G_loss = None
-                else:
-                    G_loss = model.G_losses[-1]
-                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1}), loss={(G_loss, D_loss)}...")
+                
+                D_loss_fake = None if len(model.D_loss_fake) == 0 else model.D_loss_fake[-1]
+                D_loss_real = None if len(model.D_loss_real) == 0 else model.D_loss_real[-1]
+                D_loss_grad = None if len(model.D_loss_grad) == 0 else model.D_loss_grad[-1]
+                G_loss_pred = None if len(model.G_loss_pred) == 0 else model.G_loss_pred[-1]
+                G_loss_diff = None if len(model.G_loss_diff) == 0 else model.G_loss_diff[-1]
 
-            D_loss = np.mean(model.D_losses)
-            G_loss = np.mean(model.G_losses)
-            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), loss={(G_loss, D_loss)}...")
+                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1}), (D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)={(D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)}...")
+
+            D_loss_fake = torch.mean(model.D_loss_fake)
+            D_loss_real = torch.mean(model.D_loss_real)
+            D_loss_grad = torch.mean(model.D_loss_grad)
+            G_loss_pred = torch.mean(model.G_loss_pred)
+            G_loss_diff = torch.mean(model.G_loss_diff)
+            
+            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), (D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)={(D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)}...")
+            
             pre_title = datetime.datetime.now().strftime("%y%m%d%H%M%S")
             model.save_Model(os.path.join(".", "drive", "MyDrive", "models", "GAN32" + str(epoch) + "-" + pre_title + ".pt"))
             model.draw_loss()

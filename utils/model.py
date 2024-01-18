@@ -109,7 +109,7 @@ class Discriminator32(torch.nn.Module):
             torch.nn.Linear(1024+1024,512),
             torch.nn.LeakyReLU(0.2, True),
             torch.nn.Linear(512,1),
-            torch.nn.Tanh(),  # Transform to [-1, 1]
+            torch.nn.Tanh(),  # Transform to [-1, 1], -1 means real while 1 means fake
         )
     
     
@@ -277,6 +277,7 @@ class Generator32(torch.nn.Module):
 
         voxel = voxel.reshape(-1, 32, 32, 32)
         out = torch.where(voxel == 1, 1, out)
+        # out = voxel + out
         return out
     
     
