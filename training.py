@@ -25,6 +25,7 @@ from rich.progress import Progress
 import argparse
 from test import *
 from matplotlib import pyplot as plt
+from utils.visualize import plot
 
 def gradient_penalty(y_pred, voxel_blend):
     gradients = torch.autograd.grad(outputs=y_pred, inputs=voxel_blend, grad_outputs=torch.ones_like(y_pred), create_graph=True)[0]
@@ -33,43 +34,15 @@ def gradient_penalty(y_pred, voxel_blend):
     return penalty 
 
 class GAN_trainer:
-    def __init__(self):
-        self.init_Args()
+    def __init__(self, args):
+        self.args = args
         self.load_Data()
         self.init_Loss()
-        self.G = Generator().to(self.args.available_device)  # fixed: define first
+        self.G = Generator().to(self.args.available_device)
         self.D = Discriminator().to(self.args.available_device)
         self.G_optim = optim.AdamW(self.G.parameters(), lr=self.args.g_lr, betas=(self.args.g_beta1, self.args.g_beta2), eps=self.args.g_eps, weight_decay=self.args.g_weight_decay)
         self.D_optim = optim.AdamW(self.D.parameters(), lr=self.args.d_lr, betas=(self.args.d_beta1, self.args.d_beta2), eps=self.args.d_eps, weight_decay=self.args.d_weight_decay)
         self.load_Model()
-
-        
-    def init_Args(self):
-    # Add hyperparameters.
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--train_vox_path', type=str, help="The path of the training dir.",default="./data/train")
-        parser.add_argument('--test_vox_path', type=str, help="The path of the test dir.",default="./data/test")
-        parser.add_argument('--hidden_dim', type=int, default=64, help="The hidden dim of GAN, or the resolution.")
-        parser.add_argument('--g_lr', type=float, default=1e-4, help="The learning rate for AdamW of G.")  # Hyperparameters of AdamW for G.
-        parser.add_argument('--g_beta1', type=float, default=0.9, help="Beta1 for AdamW of G.")
-        parser.add_argument('--g_beta2', type=float, default=0.999, help="Beta2 for AdamW of G.")
-        parser.add_argument('--g_eps', type=float, default=1e-8, help="Epsilon for AdamW of G.")
-        parser.add_argument('--g_weight_decay', type=float, default=0.01, help="Weight decay for AdamW of G.")
-        parser.add_argument('--d_lr', type=float, default=1e-4, help="The learning rate for AdamW of D.")  # Hyperparameters of AdamW for D.
-        parser.add_argument('--d_beta1', type=float, default=0.9, help="Beta1 for AdamW of D.")
-        parser.add_argument('--d_beta2', type=float, default=0.999, help="Beta2 for AdamW of D.")
-        parser.add_argument('--d_eps', type=float, default=1e-8, help="Epsilon for AdamW of D.")
-        parser.add_argument('--d_weight_decay', type=float, default=0.01, help="Weight decay for AdamW of D.")
-        parser.add_argument('--batch_size', type=int, default=64, help="The batch size for both training and test.")
-        parser.add_argument('--epochs', type=int, help="Total epochs of training.",default=1)
-        parser.add_argument('--available_device', type=str, help="available device",default="cuda:0" if torch.cuda.is_available() else "cpu")
-        parser.add_argument('--model_name', type=str, help="Name of the model.",default='gan32')
-        parser.add_argument('--load_path', type=str, help="Where to load the model.",default=None)
-        parser.add_argument('--save_path', type=str, help="Where to save the model.",default=None)
-        parser.add_argument('--global_step', type=int, help="Global step of training.",default=0)
-        self.args = parser.parse_args()
-        self.args.save_path = None or "models/" + self.args.model_name + ".pt"
-        print("Args Resolved Succesfully")
 
     def load_Model(self):
         try:
@@ -107,7 +80,6 @@ class GAN_trainer:
         self.G_loss_diff = []
         self.G_loss_pred = []
 
-
     def blend(self, voxel_fake, voxel_real):
         b = voxel_fake.shape[0]
         alpha = torch.rand(b,1,1,1).to(self.args.available_device)
@@ -125,14 +97,8 @@ class GAN_trainer:
         self.D_loss_real.append(loss_real.to('cpu').detach().numpy())
         self.D_loss_grad.append(loss_grad.to('cpu').detach().numpy())
         loss = loss_real + loss_fake + loss_grad
-        # loss_cpu = loss
-        # self.D_losses.append(loss_cpu.to('cpu').detach().numpy())
-        # self.D_real_losses.append(loss_real.to('cpu').detach().numpy())
-        # self.D_fake_losses.append(loss_fake.to('cpu').detach().numpy())
         loss.backward()
         self.D_optim.step()
-        # self.save_Model()
-        # self.draw_loss()
 
     def train_G(self, voxel_whole, voxel_frag, label):
         voxel_pred = self.G(voxel_frag, label)
@@ -143,15 +109,11 @@ class GAN_trainer:
         self.G_loss_diff.append(loss_diff.to('cpu').detach().numpy())
         self.G_loss_pred.append(loss_pred.to('cpu').detach().numpy())
         loss = loss_diff + loss_pred
-        # loss_cpu = loss
-        # self.G_losses.append(loss_cpu.to('cpu').detach().numpy())
         loss.backward()
         self.G_optim.step()
-        # self.save_Model()
 
-    def save_Model(self, path=None):
-        if path is None:
-            path = self.args.save_path
+    def save_Model(self, name):
+        path = os.path.join(self.args.save_dir, name)
         torch.save({
             'model-G':self.G.state_dict(),
             'optim-G':self.G_optim.state_dict(),
@@ -167,52 +129,85 @@ class GAN_trainer:
             path)
         print(f"Model Saved to {path} Successfully!")
 
-    '''
-    def draw_loss(self):
-        pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
-        plt.figure()
-        plt.plot(self.G_losses)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-G.jpg")
-        plt.cla()
-        plt.plot(self.D_losses)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D.jpg")
-        plt.cla()
-        plt.plot(self.D_fake_losses)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-fake-D.jpg")
-        plt.cla()
-        plt.plot(self.D_real_losses)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-real-D.jpg")
-        plt.cla()
-    '''
-
-    def draw_loss(self):
+    def draw_loss(self, dir="lossPics"):
         pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
         plt.figure()
         plt.plot(self.G_loss_pred)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-G_loss_pred.jpg")
+        plt.savefig(os.path.join(dir, f"{pre_title}-G_loss_pred.jpg"))
         plt.cla()
         plt.plot(self.G_loss_diff)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-G_loss_diff.jpg")
+        plt.savefig(os.path.join(dir, f"{pre_title}-G_loss_diff.jpg"))
         plt.cla()
         plt.plot(self.D_loss_fake)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D_loss_fake.jpg")
+        plt.savefig(os.path.join(dir, f"{pre_title}-D_loss_fake.jpg"))
         plt.cla()
         plt.plot(self.D_loss_real)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D_loss_real.jpg")
+        plt.savefig(os.path.join(dir, f"{pre_title}-D_loss_real.jpg"))
         plt.cla()
         plt.plot(self.D_loss_grad)
-        plt.savefig(f"drive/MyDrive/lossPics/{pre_title}-D_loss_grad.jpg")
+        plt.savefig(os.path.join(dir, f"{pre_title}-D_loss_grad.jpg"))
         plt.cla()
         
+    def test(self, limit=-1):
+        self.G.eval()
+        with torch.no_grad():
+            for step, (frag, gt, frag_id, label, path) in enumerate(self.test_dataloader):
+                if limit >= 0 and step >= limit:
+                    break
+                gt = gt.reshape(32, 32, 32)
+                frag = frag.to(self.args.available_device)
+                label = label.to(self.args.available_device)
+                path = path[0]
+
+                pred = self.G(frag, label).to('cpu').reshape(32, 32, 32)
+                print(f"Plot {step}, {path}, {torch.max(pred)}")
+                plot(pred, path + ".pred.png", False)
+                plot(gt, path + ".real.png", False)
 
 
-'''1.16-change'''
-def downSample(vox):
-    b = vox.shape[0]
-    vox = vox.reshape(b,1,64,64,64)
-    vox = torch.nn.functional.interpolate(vox, scale_factor=(0.5,0.5,0.5), mode='nearest')
-    vox = vox.reshape(b,32,32,32)
-    return vox
+def train(trainer: GAN_trainer):
+    # Training loop.
+    with Progress() as progress:
+        task1 = progress.add_task(f"[red]Epoch Training({0}/{trainer.args.epochs})...",total=trainer.args.epochs)
+
+        for epoch in range(1, trainer.args.epochs + 1):
+            task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(trainer.train_dataloader)-1})...",total=len(trainer.train_dataloader)-1)
+
+            for step, (frags, voxes, frag_ids, labels, paths) in enumerate(trainer.train_dataloader):
+                trainer.args.global_step += 1
+                frags = frags.to(trainer.args.available_device)
+                voxes = voxes.to(trainer.args.available_device)
+                labels = labels.to(trainer.args.available_device)  # fixed: device bug
+
+                if trainer.args.global_step % 5 == 0:
+                    trainer.train_G(voxes,frags,labels)
+                trainer.train_D(voxes,frags,labels)
+                
+                D_loss_fake = None if len(trainer.D_loss_fake) == 0 else trainer.D_loss_fake[-1]
+                D_loss_real = None if len(trainer.D_loss_real) == 0 else trainer.D_loss_real[-1]
+                D_loss_grad = None if len(trainer.D_loss_grad) == 0 else trainer.D_loss_grad[-1]
+                G_loss_pred = None if len(trainer.G_loss_pred) == 0 else trainer.G_loss_pred[-1]
+                G_loss_diff = None if len(trainer.G_loss_diff) == 0 else trainer.G_loss_diff[-1]
+
+                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.train_dataloader)-1}), (D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)={(D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)}...")
+
+            D_loss_fake = torch.mean(trainer.D_loss_fake)
+            D_loss_real = torch.mean(trainer.D_loss_real)
+            D_loss_grad = torch.mean(trainer.D_loss_grad)
+            G_loss_pred = torch.mean(trainer.G_loss_pred)
+            G_loss_diff = torch.mean(trainer.G_loss_diff)
+            
+            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), (DF,DR,DG,GP,GD)={(D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)}...")
+            
+            date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            trainer.save_Model("GAN32" + str(epoch) + "-" + date + ".pt")
+            trainer.draw_loss()
+
+    print("Finished training!")
+
+
+def test(trainer: GAN_trainer):
+    trainer.test(5)
 
 
 def main():
@@ -237,52 +232,38 @@ def main():
     torch.manual_seed(2024)
     torch.cuda.manual_seed_all(2024)
     
-    model = GAN_trainer()
+    # Parse args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train_vox_path', type=str, help="The path of the training dir.",default="./data/train")
+    parser.add_argument('--test_vox_path', type=str, help="The path of the test dir.",default="./data/test")
+    parser.add_argument('--hidden_dim', type=int, default=64, help="The hidden dim of GAN, or the resolution.")
+    parser.add_argument('--g_lr', type=float, default=1e-4, help="The learning rate for AdamW of G.")  # Hyperparameters of AdamW for G.
+    parser.add_argument('--g_beta1', type=float, default=0.9, help="Beta1 for AdamW of G.")
+    parser.add_argument('--g_beta2', type=float, default=0.999, help="Beta2 for AdamW of G.")
+    parser.add_argument('--g_eps', type=float, default=1e-8, help="Epsilon for AdamW of G.")
+    parser.add_argument('--g_weight_decay', type=float, default=0.01, help="Weight decay for AdamW of G.")
+    parser.add_argument('--d_lr', type=float, default=1e-4, help="The learning rate for AdamW of D.")  # Hyperparameters of AdamW for D.
+    parser.add_argument('--d_beta1', type=float, default=0.9, help="Beta1 for AdamW of D.")
+    parser.add_argument('--d_beta2', type=float, default=0.999, help="Beta2 for AdamW of D.")
+    parser.add_argument('--d_eps', type=float, default=1e-8, help="Epsilon for AdamW of D.")
+    parser.add_argument('--d_weight_decay', type=float, default=0.01, help="Weight decay for AdamW of D.")
+    parser.add_argument('--batch_size', type=int, default=64, help="The batch size for both training and test.")
+    parser.add_argument('--epochs', type=int, help="Total epochs of training.",default=1)
+    parser.add_argument('--available_device', type=str, help="available device",default="cuda:0" if torch.cuda.is_available() else "cpu")
+    parser.add_argument('--model_name', type=str, help="Name of the model.",default='gan32')
+    parser.add_argument('--load_path', type=str, help="Where to load the model.",default="")
+    parser.add_argument('--save_dir', type=str, help="Where to save the model.",default="models")
+    parser.add_argument('--global_step', type=int, help="Global step of training.",default=0)
+    parser.add_argument('--mode', type=str, default="train")
+    args = parser.parse_args()
+    
+    trainer = GAN_trainer(args)
+    
+    if args.mode == "train":
+        train(trainer)
+    elif args.mode == "test":
+        test(trainer)
 
-    # Training loop.
-    with Progress() as progress:
-        task1 = progress.add_task(f"[red]Epoch Training({0}/{model.args.epochs})...",total=model.args.epochs)
-
-        for epoch in range(1, model.args.epochs + 1):
-            task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(model.train_dataloader)-1})...",total=len(model.train_dataloader)-1)
-
-            for step, (frags, voxes, frag_ids, labels, paths) in enumerate(model.train_dataloader):
-                
-                model.args.global_step += 1
-                frags = frags.to(model.args.available_device)
-                voxes = voxes.to(model.args.available_device)
-                labels = labels.to(model.args.available_device)  # fixed: device bug
-
-                if model.args.global_step % 5 == 0:
-                    model.train_G(voxes,frags,labels)
-                model.train_D(voxes,frags,labels)
-
-                
-                D_loss_fake = None if len(model.D_loss_fake) == 0 else model.D_loss_fake[-1]
-                D_loss_real = None if len(model.D_loss_real) == 0 else model.D_loss_real[-1]
-                D_loss_grad = None if len(model.D_loss_grad) == 0 else model.D_loss_grad[-1]
-                G_loss_pred = None if len(model.G_loss_pred) == 0 else model.G_loss_pred[-1]
-                G_loss_diff = None if len(model.G_loss_diff) == 0 else model.G_loss_diff[-1]
-
-                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(model.train_dataloader)-1}), (D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)={(D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)}...")
-
-            D_loss_fake = torch.mean(model.D_loss_fake)
-            D_loss_real = torch.mean(model.D_loss_real)
-            D_loss_grad = torch.mean(model.D_loss_grad)
-            G_loss_pred = torch.mean(model.G_loss_pred)
-            G_loss_diff = torch.mean(model.G_loss_diff)
-            
-            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{model.args.epochs}), (D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)={(D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)}...")
-            
-            pre_title = datetime.datetime.now().strftime("%y%m%d%H%M%S")
-            model.save_Model(os.path.join(".", "drive", "MyDrive", "models", "GAN32" + str(epoch) + "-" + pre_title + ".pt"))
-            model.draw_loss()
-        
-            # you may call test functions in specific numbers of iterartions
-            # remember to stop gradients in testing!
-            # also you may save checkpoints in specific numbers of iterartions
-
-    print("Finished training!")    
 
 if __name__ == "__main__":
     main()
