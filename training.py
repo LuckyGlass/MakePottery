@@ -93,9 +93,9 @@ class GAN_trainer:
         loss_real = self.D_loss1(self.D(voxel_whole,label))
         loss_fake = self.D_loss2(self.D(voxel_pred,label))
         loss_grad = self.D_loss3(self.D(voxel_blend,label),voxel_blend)
-        self.D_loss_fake.append(loss_fake.to('cpu').detach().numpy())
-        self.D_loss_real.append(loss_real.to('cpu').detach().numpy())
-        self.D_loss_grad.append(loss_grad.to('cpu').detach().numpy())
+        self.D_loss_fake.append(loss_fake.item())
+        self.D_loss_real.append(loss_real.item())
+        self.D_loss_grad.append(loss_grad.item())
         loss = loss_real + loss_fake + loss_grad
         loss.backward()
         self.D_optim.step()
@@ -106,8 +106,8 @@ class GAN_trainer:
         self.G_optim.zero_grad()
         loss_diff = self.G_loss1(voxel_pred, voxel_whole)
         loss_pred = self.G_loss2(self.D(voxel_pred,label))
-        self.G_loss_diff.append(loss_diff.to('cpu').detach().numpy())
-        self.G_loss_pred.append(loss_pred.to('cpu').detach().numpy())
+        self.G_loss_diff.append(loss_diff.item())
+        self.G_loss_pred.append(loss_pred.item())
         loss = loss_diff + loss_pred
         loss.backward()
         self.G_optim.step()
@@ -179,25 +179,25 @@ def train(trainer: GAN_trainer):
                 voxes = voxes.to(trainer.args.available_device)
                 labels = labels.to(trainer.args.available_device)  # fixed: device bug
 
-                if trainer.args.global_step % 5 == 0:
+                if trainer.args.global_step % 2 == 0:
                     trainer.train_G(voxes,frags,labels)
                 trainer.train_D(voxes,frags,labels)
                 
-                D_loss_fake = None if len(trainer.D_loss_fake) == 0 else trainer.D_loss_fake[-1]
-                D_loss_real = None if len(trainer.D_loss_real) == 0 else trainer.D_loss_real[-1]
-                D_loss_grad = None if len(trainer.D_loss_grad) == 0 else trainer.D_loss_grad[-1]
-                G_loss_pred = None if len(trainer.G_loss_pred) == 0 else trainer.G_loss_pred[-1]
-                G_loss_diff = None if len(trainer.G_loss_diff) == 0 else trainer.G_loss_diff[-1]
+                D_loss_fake = float("inf") if len(trainer.D_loss_fake) == 0 else trainer.D_loss_fake[-1]
+                D_loss_real = float("inf") if len(trainer.D_loss_real) == 0 else trainer.D_loss_real[-1]
+                D_loss_grad = float("inf") if len(trainer.D_loss_grad) == 0 else trainer.D_loss_grad[-1]
+                G_loss_pred = float("inf") if len(trainer.G_loss_pred) == 0 else trainer.G_loss_pred[-1]
+                G_loss_diff = float("inf") if len(trainer.G_loss_diff) == 0 else trainer.G_loss_diff[-1]
 
-                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.train_dataloader)-1}), (D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)={(D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)}...")
+                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.train_dataloader)-1}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
 
-            D_loss_fake = torch.mean(trainer.D_loss_fake)
-            D_loss_real = torch.mean(trainer.D_loss_real)
-            D_loss_grad = torch.mean(trainer.D_loss_grad)
-            G_loss_pred = torch.mean(trainer.G_loss_pred)
-            G_loss_diff = torch.mean(trainer.G_loss_diff)
+            D_loss_fake = np.mean(trainer.D_loss_fake)
+            D_loss_real = np.mean(trainer.D_loss_real)
+            D_loss_grad = np.mean(trainer.D_loss_grad)
+            G_loss_pred = np.mean(trainer.G_loss_pred)
+            G_loss_diff = np.mean(trainer.G_loss_diff)
             
-            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), (DF,DR,DG,GP,GD)={(D_loss_fake,D_loss_real,D_loss_grad,G_loss_pred,G_loss_diff)}...")
+            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
             
             date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
             trainer.save_Model("GAN32" + str(epoch) + "-" + date + ".pt")
@@ -274,6 +274,9 @@ python training.py \
     --test_vox_path data/test \
     --epochs 10 \
     --batch_size 16 \
-    --hidden_dim 32
+    --hidden_dim 32 \
+    --mode train \
+    --g_lr 1e-3 \
+    --d_lr 1e-5
 python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
 """
