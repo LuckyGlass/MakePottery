@@ -208,6 +208,30 @@ def train(trainer: GAN_trainer):
 
 def test(trainer: GAN_trainer):
     trainer.test(5)
+    
+
+def debug(trainer: GAN_trainer):
+    with Progress() as progress:
+        task1 = progress.add_task(f"[red]Epoch Training({0}/{trainer.args.epochs})...",total=trainer.args.epochs)
+
+        for epoch in range(1, trainer.args.epochs + 1):
+            task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(trainer.train_dataloader)-1})...",total=len(trainer.train_dataloader)-1)
+
+            for step, (frags, voxes, frag_ids, labels, paths) in enumerate(trainer.train_dataloader):
+                trainer.args.global_step += 1
+                frags = frags.to(trainer.args.available_device)
+                voxes = voxes.to(trainer.args.available_device)
+                labels = labels.to(trainer.args.available_device)  # fixed: device bug
+                trainer.train_G(voxes,frags,labels)
+                G_loss_diff = float("inf") if len(trainer.G_loss_diff) == 0 else trainer.G_loss_diff[-1]
+                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.train_dataloader)-1}), {G_loss_diff:.2f}...")
+
+            G_loss_diff = np.mean(trainer.G_loss_diff)
+            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), {G_loss_diff:.2f}...")
+            date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            trainer.save_Model("debug" + str(epoch) + "-" + date + ".pt")
+
+    print("Finished training!")
 
 
 def main():
@@ -263,6 +287,8 @@ def main():
         train(trainer)
     elif args.mode == "test":
         test(trainer)
+    elif args.mode == "debug":
+        debug(trainer)
 
 
 if __name__ == "__main__":
