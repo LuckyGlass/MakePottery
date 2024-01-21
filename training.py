@@ -69,7 +69,7 @@ class GAN_trainer:
         print("Data Loaded Successfully!")
 
     def init_Loss(self):
-        self.G_loss1 = nn.L1Loss()                          # should converge to 0
+        self.G_loss1 = gLossDiff                            # should converge to 0
         self.G_loss2 = lambda y_pred: torch.mean(y_pred)    # should converge to ??
         self.D_loss1 = lambda y_pred: torch.mean(y_pred)    # should converge to ??
         self.D_loss2 = lambda y_pred: -torch.mean(y_pred)   # should converge to ??
@@ -161,7 +161,7 @@ class GAN_trainer:
 
                 pred = self.G(frag, label).to('cpu').reshape(32, 32, 32)
                 print(f"Plot {step}, {path}, {torch.max(pred)}")
-                plot(pred, path + ".pred.png", False)
+                plot(torch.round(pred) - frag.to('cpu').reshape(32, 32, 32), path + ".pred.png", False)
                 plot(gt, path + ".real.png", False)
 
 
@@ -304,5 +304,20 @@ python training.py \
     --mode train \
     --g_lr 1e-3 \
     --d_lr 1e-5
+python training.py \
+    --train_vox_path data/train \
+    --test_vox_path data/test \
+    --epochs 3 \
+    --batch_size 16 \
+    --hidden_dim 32 \
+    --mode debug \
+    --g_lr 1e-2
+python training.py \
+    --train_vox_path data/train \
+    --test_vox_path data/train \
+    --batch_size 1 \
+    --hidden_dim 32 \
+    --mode test \
+    --load_path models/debug3-240121235942.pt
 python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
 """

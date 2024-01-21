@@ -10,6 +10,13 @@ from torch import nn
 from utils.FragmentDataset import FragmentDataset
 from utils.model import Generator, Discriminator
 
+
+def gLossDiff(pred: torch.Tensor, real: torch.Tensor):
+    temp = torch.where(real == 0, pred, 100 * (1 - pred))
+    loss = torch.mean(torch.sum(temp, dim=(1, 2, 3)))
+    return loss
+
+
 def test():
     # TODO
     # You can also implement this function in training procedure, but be sure to
