@@ -17,7 +17,7 @@ class SE(torch.nn.Module):
         self.avg_pool = torch.nn.AdaptiveAvgPool3d(1)
         self.fc = torch.nn.Sequential(
             torch.nn.Linear(in_channels, in_channels // reduction_ratio),
-            torch.nn.ReLU(True),  # fixed: ReLU -> ReLU()
+            torch.nn.ReLU(),  # fixed: ReLU -> ReLU()
             torch.nn.Linear(in_channels // reduction_ratio, in_channels),
             torch.nn.Sigmoid()
         )
@@ -47,7 +47,7 @@ class Conv3DforG(torch.nn.Module):
         super(Conv3DforG, self).__init__()
         self.c1 = torch.nn.Conv3d(in_channels, out_channels, kernel_size, stride, padding)
         self.bn = torch.nn.BatchNorm3d(out_channels)
-        self.ac = torch.nn.ReLU(True)
+        self.ac = torch.nn.ReLU()
         self.se = SE(out_channels)
 
     def forward(self, x):
@@ -96,22 +96,21 @@ class Discriminator32(torch.nn.Module):
         self.encoderv = torch.nn.Sequential(
             torch.nn.Flatten(),
             torch.nn.Linear(2048,1024),
-            torch.nn.BatchNorm1d(1024),
-            torch.nn.LeakyReLU(0.2, True)
+            torch.nn.LeakyReLU(0.2)
         )
         # Encode for label
         self.encoderl = torch.nn.Sequential(
             torch.nn.Embedding(11,64),
             torch.nn.Flatten(),
             torch.nn.Linear(64,1024),
-            torch.nn.BatchNorm1d(1024),
-            torch.nn.LeakyReLU(0.2, True)
+            torch.nn.LeakyReLU(0.2)
         )
         self.final = torch.nn.Sequential(
-            torch.nn.Linear(1024+1024,512),
-            torch.nn.BatchNorm1d(512),
-            torch.nn.LeakyReLU(0.2, True),
-            torch.nn.Linear(512,1),
+            torch.nn.Linear(1024+1024, 1024),  # debug: insert this layer
+            torch.nn.LeakyReLU(0.2),
+            torch.nn.Linear(1024, 512),
+            torch.nn.LeakyReLU(0.2),
+            torch.nn.Linear(512, 1),
             torch.nn.Tanh(),  # Transform to [-1, 1], -1 means real while 1 means fake
         )
     
@@ -121,46 +120,27 @@ class Discriminator32(torch.nn.Module):
         # Note that the shape of x may need adjustment
         # Do not forget the batch size in x.dim
 
-        b = voxel.shape[0]
-        voxel = voxel.reshape(b,1,32,32,32)
+        voxel = voxel.reshape(-1, 1, 32, 32, 32)
         
         # Encode for Voxel
-        # 32^3*1  -> 32^3*32
-        assert voxel.shape == (b,1,32,32,32)
-        v1 = self.encoder1(voxel)
-        # 32^3*32 -> 16^3*32
-        assert v1.shape == (b,32,32,32,32)
-        v2 = self.encoder2(v1)
-        # 16^3*32 -> 8^3 *64
-        assert v2.shape == (b,32,16,16,16)
-        v3 = self.encoder3(v2)
-        # 8^3 *64 -> 4^3 *128
-        assert v3.shape == (b,64,8,8,8)
-        v4 = self.encoder4(v3)
-        # 4^3 *128-> 2^3 *256
-        assert v4.shape == (b,128,4,4,4)
-        v5 = self.encoder5(v4)
-        # 2^3 *256-> 1024 
-        assert v5.shape == (b,256,2,2,2)
-        v = self.encoderv(v5)
+        v1 = self.encoder1(voxel) # 32^3*1  -> 32^3*32
+        v2 = self.encoder2(v1)    # 32^3*32 -> 16^3*32
+        v3 = self.encoder3(v2)    # 16^3*32 -> 8^3 *64
+        v4 = self.encoder4(v3)    # 8^3 *64 -> 4^3 *128
+        v5 = self.encoder5(v4)    # 4^3 *128-> 2^3 *256
+        v  = self.encoderv(v5)    # 2^3 *256-> 1024 
 
         # Encode for label:1->1024
         l = self.encoderl(label)
 
         # final out
-        assert v.shape == (b,1024)
-        assert l.shape == (b,1024)
-        inp = torch.cat((v,l),dim=1)
-        assert inp.shape == (b,1024*2)
-        out = self.final(inp)
-        out = out.reshape(b)
-        assert out.shape == (b,)
+        inp = torch.cat((v, l), dim=1)
+        out = self.final(inp).reshape(-1)
 
         return out
 
 
 class Generator32(torch.nn.Module):
-    # TODO
     def __init__(self):
         # similar to Discriminator
         # Despite the blocks introduced above, you may also find torch.nn.ConvTranspose3d()
@@ -182,7 +162,7 @@ class Generator32(torch.nn.Module):
         self.encoderv = torch.nn.Sequential(
             torch.nn.Flatten(),
             torch.nn.Linear(2048,1024),  # fixed: input_dim 1024 -> 2048
-            torch.nn.ReLU(True)
+            torch.nn.ReLU()
         )
 
         # Encode for label:1->1024
@@ -190,11 +170,16 @@ class Generator32(torch.nn.Module):
             torch.nn.Embedding(11,64),
             torch.nn.Flatten(),
             torch.nn.Linear(64,1024),
-            torch.nn.ReLU(True)
+            torch.nn.ReLU()
         )
 
         # Concat and Transpose
-        self.concat = torch.nn.Linear(1024+1024,1024)
+        self.concat = torch.nn.Sequential(  # fix: I think it's important!
+            torch.nn.Linear(2048, 1024),
+            torch.nn.ReLU(),
+            torch.nn.Linear(1024, 2048),
+            torch.nn.ReLU()
+        )
 
         # Decode
         # 2^3 *256 -> 4^3 *128 
@@ -215,71 +200,40 @@ class Generator32(torch.nn.Module):
     def forward(self, voxel, label):
         # you may also find torch.view() useful
         # we strongly suggest you to write this method seperately to forward_encode(self, x) and forward_decode(self, x)   
-        b = voxel.shape[0]
-        voxel = voxel.reshape(b,1,32,32,32)  # fixed: voxel = ...
+        voxel = voxel.reshape(-1, 1, 32, 32, 32)  # fixed: voxel = ...
         
         # Encode for Voxel
-        # 32^3*1  -> 32^3*32
-        assert voxel.shape == (b,1,32,32,32)
-        v1 = self.encoder1(voxel)
-        # 32^3*32 -> 16^3*32
-        assert v1.shape == (b,32,32,32,32)
-        v2 = self.encoder2(v1)
-        # 16^3*32 -> 8^3 *64
-        assert v2.shape == (b,32,16,16,16)
-        v3 = self.encoder3(v2)
-        # 8^3 *64 -> 4^3 *128
-        assert v3.shape == (b,64,8,8,8)
-        v4 = self.encoder4(v3)
-        # 4^3 *128-> 2^3 *256
-        assert v4.shape == (b,128,4,4,4)
-        v5 = self.encoder5(v4)
-        # 2^3 *256-> 1024 
-        assert v5.shape == (b,256,2,2,2)
-        v = self.encoderv(v5)
+        v1 = self.encoder1(voxel)  # 32^3*1  -> 32^3*32
+        v2 = self.encoder2(v1)     # 32^3*32 -> 16^3*32
+        v3 = self.encoder3(v2)     # 16^3*32 -> 8^3 *64
+        v4 = self.encoder4(v3)     # 8^3 *64 -> 4^3 *128
+        v5 = self.encoder5(v4)     # 4^3 *128-> 2^3 *256
+        v = self.encoderv(v5)      # 2^3 *256-> 1024 
 
         # Encode for label:1->1024
         l = self.encoderl(label)
 
         # Concat and Transpose
-        assert v.shape == (b,1024)
-        assert l.shape == (b,1024)
-        inp = torch.cat((v,l),dim=1)
-        assert inp.shape == (b,1024+1024)
-        inp = inp.reshape(b,256,2,2,2)
-        assert inp.shape == (b,256,2,2,2)
+        inp = torch.cat((v, l), dim=1)
+        inp = self.concat(inp)  # fix: I think it's important!
+        inp = inp.reshape(-1, 256, 2, 2, 2)
 
         # Decode
-        # 2^3 *256 -> 4^3 *128 
         d5 = torch.concat([inp, v5], dim=1)  # fixed: missing 'dim'
-        assert d5.shape == (b,256*2,2,2,2)
-        d5 = self.decoder1(d5)
-        # 4^3 *128 -> 8^3 *64  
-        assert d5.shape == (b,128,4,4,4)
+        d5 = self.decoder1(d5)  # 2^3 x 512 -> 4^3 x 128 
         d4 = torch.concat([d5, v4], dim=1)  # fixed: missing 'dim'
-        assert d4.shape == (b,128*2,4,4,4)
-        d4 = self.decoder2(d4)
-        # 8^3 *64  -> 16^3*32  
-        assert d4.shape == (b,64,8,8,8)
+        d4 = self.decoder2(d4)  # 4^3 x 256 -> 8^3 x 64
         d3 = torch.concat([d4, v3], dim=1)  # fixed: missing 'dim'
-        assert d3.shape == (b,64*2,8,8,8)
-        d3 = self.decoder3(d3)
-        # 16^3*32  -> 32^3*32  
-        assert d3.shape == (b,32,16,16,16)
+        d3 = self.decoder3(d3)  # 8^3 x 128 -> 16^3 x 32  
         d2 = torch.concat([d3, v2], dim=1)  # fixed: missing 'dim'
-        assert d2.shape == (b,32*2,16,16,16)
-        d2 = self.decoder4(d2)
-        # 32^3*32  -> 32^3*1   
-        assert d2.shape == (b,32,32,32,32)
+        d2 = self.decoder4(d2)  # 16^3 x 64 -> 32^3 x 32
         d1 = torch.concat([d2, v1], dim=1)  # fixed: missing 'dim'
-        assert d1.shape == (b,32*2,32,32,32)
-        d1 = self.decoder5(d1)
+        d1 = self.decoder5(d1)  # 32^3 x 64  -> 32^3 x 1
 
-        out = d1.reshape(b,32,32,32)
-        assert out.shape == (b,32,32,32)
+        out = d1.reshape(-1, 32, 32, 32)
 
         voxel = voxel.reshape(-1, 32, 32, 32)
-        # out = torch.where(voxel == 1, 1, out)
+        out = torch.where(voxel == 1, 1, out)
         return out
     
     
