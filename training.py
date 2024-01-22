@@ -148,7 +148,7 @@ class GAN_trainer:
         plt.savefig(os.path.join(dir, f"{pre_title}-D_loss_grad.jpg"))
         plt.cla()
         
-    def test(self, limit=-1):
+    def test(self, limit=-1, show_frag=False):
         self.G.eval()
         with torch.no_grad():
             for step, (frag, gt, frag_id, label, path) in enumerate(self.test_dataloader):
@@ -160,8 +160,12 @@ class GAN_trainer:
                 path = path[0]
 
                 pred = self.G(frag, label).to('cpu').reshape(32, 32, 32)
+                if show_frag:
+                    to_plot = torch.round(pred)
+                else:
+                    to_plot = torch.round(pred) - frag.to('cpu').reshape(32, 32, 32)
                 print(f"Plot {step}, {path}, {torch.max(pred)}")
-                plot(torch.round(pred) - frag.to('cpu').reshape(32, 32, 32), path + ".pred.png", False)
+                plot(to_plot, path + ".pred.png", False)
                 plot(gt, path + ".real.png", False)
 
 
@@ -207,7 +211,7 @@ def train(trainer: GAN_trainer):
 
 
 def test(trainer: GAN_trainer):
-    trainer.test(5)
+    trainer.test(5, True)
     
 
 def debug(trainer: GAN_trainer):
@@ -314,10 +318,10 @@ python training.py \
     --g_lr 1e-2
 python training.py \
     --train_vox_path data/train \
-    --test_vox_path data/train \
+    --test_vox_path data/test \
     --batch_size 1 \
     --hidden_dim 32 \
     --mode test \
-    --load_path models/debug3-240121235942.pt
+    --load_path models/GAN328-240122015507.pt
 python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
 """
