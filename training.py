@@ -25,7 +25,7 @@ from rich.progress import Progress
 import argparse
 from test import *
 from matplotlib import pyplot as plt
-from utils.visualize import plot
+from utils.visualize import plot_join, plot
 
 def gradient_penalty(y_pred, voxel_blend):
     gradients = torch.autograd.grad(outputs=y_pred, inputs=voxel_blend, grad_outputs=torch.ones_like(y_pred), create_graph=True)[0]
@@ -161,15 +161,16 @@ class GAN_trainer:
                 label = label.to(self.args.available_device)
                 path = path[0]
 
+                cnt += 1
                 pred = self.G(frag, label).to('cpu').reshape(32, 32, 32)
                 if show_frag:
-                    to_plot = torch.round(pred)
-                else:
                     to_plot = torch.round(pred) - frag.to('cpu').reshape(32, 32, 32)
-                print(f"Plot {step}, {path}, {torch.max(pred)}")
-                cnt += 1
-                plot(to_plot, os.path.join("testPics", str(cnt) + ".pred.png"), False)
+                    plot_join(to_plot, frag.to('cpu').reshape(32, 32, 32), os.path.join("testPics", str(cnt) + ".pred.png"), False)
+                else:
+                    to_plot = torch.round(pred)
+                    plot(to_plot, os.path.join("testPics", str(cnt) + ".pred.png"), False)
                 plot(gt, os.path.join("testPics", str(cnt) + ".real.png"), False)
+                print(f"Plot {step}, {path}, {torch.max(pred)}")
 
 
 def train(trainer: GAN_trainer):
