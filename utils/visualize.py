@@ -158,7 +158,7 @@ def plot_join(vox_1, vox_2):
     for i, vox in enumerate([vox_1, vox_2]):
         voxels = np.array(np.where(vox)).T
         x, y, z = voxels[:, 0], voxels[:, 1], voxels[:, 2]
-        scatter = go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=5, symbol='square', color=colors[i], line=dict(width=2,color='DarkSlateGrey',)))
+        scatter = go.Scatter3d(x=x, y=y, z=-z, mode='markers', marker=dict(size=5, symbol='square', color=colors[i], line=dict(width=2,color='DarkSlateGrey',)))
         data.append(scatter)
     fig = go.Figure(data)
     fig.update_layout()
