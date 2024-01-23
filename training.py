@@ -65,7 +65,7 @@ class GAN_trainer:
         train_dataset = FragmentDataset(self.args.train_vox_path, "train", dim_size=self.args.hidden_dim)
         test_dataset = FragmentDataset(self.args.test_vox_path, "test", dim_size=self.args.hidden_dim)
         self.train_dataloader = data.DataLoader(train_dataset, batch_size=self.args.batch_size, shuffle=True)
-        self.test_dataloader = data.DataLoader(test_dataset, batch_size=self.args.batch_size, shuffle=False)
+        self.test_dataloader = data.DataLoader(test_dataset, batch_size=self.args.batch_size, shuffle=True)
         print("Data Loaded Successfully!")
 
     def init_Loss(self):
@@ -119,7 +119,6 @@ class GAN_trainer:
             'optim-G':self.G_optim.state_dict(),
             'model-D':self.D.state_dict(),
             'optim-D':self.D_optim.state_dict(),
-            'args':self.args,
             'G_loss_diff':self.G_loss_diff,
             'G_loss_pred':self.G_loss_pred,
             'D_loss_fake':self.D_loss_fake,
@@ -149,7 +148,10 @@ class GAN_trainer:
         plt.cla()
         
     def test(self, limit=-1, show_frag=False):
+        if not os.path.exists("testPics"):
+            os.makedirs("testPics")
         self.G.eval()
+        cnt = 0
         with torch.no_grad():
             for step, (frag, gt, frag_id, label, path) in enumerate(self.test_dataloader):
                 if limit >= 0 and step >= limit:
@@ -165,8 +167,9 @@ class GAN_trainer:
                 else:
                     to_plot = torch.round(pred) - frag.to('cpu').reshape(32, 32, 32)
                 print(f"Plot {step}, {path}, {torch.max(pred)}")
-                plot(to_plot, path + ".pred.png", False)
-                plot(gt, path + ".real.png", False)
+                cnt += 1
+                plot(to_plot, os.path.join("testPics", str(cnt) + ".pred.png"), False)
+                plot(gt, os.path.join("testPics", str(cnt) + ".real.png"), False)
 
 
 def train(trainer: GAN_trainer):
@@ -211,7 +214,7 @@ def train(trainer: GAN_trainer):
 
 
 def test(trainer: GAN_trainer):
-    trainer.test(5, True)
+    trainer.test(10, True)
     
 
 def debug(trainer: GAN_trainer):
@@ -302,7 +305,7 @@ if __name__ == "__main__":
 python training.py \
     --train_vox_path data/train \
     --test_vox_path data/test \
-    --epochs 10 \
+    --epochs 20 \
     --batch_size 16 \
     --hidden_dim 32 \
     --mode train \
@@ -319,9 +322,19 @@ python training.py \
 python training.py \
     --train_vox_path data/train \
     --test_vox_path data/test \
+    --epochs 20 \
+    --batch_size 16 \
+    --hidden_dim 32 \
+    --mode train \
+    --g_lr 1e-3 \
+    --d_lr 1e-5 \
+    --load_path models/GAN3220-240122133954.pt
+python training.py \
+    --train_vox_path data/train \
+    --test_vox_path data/train \
     --batch_size 1 \
     --hidden_dim 32 \
     --mode test \
-    --load_path models/GAN328-240122015507.pt
+    --load_path models/GAN3220-240122173034.pt
 python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
 """
