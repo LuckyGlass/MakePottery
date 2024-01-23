@@ -56,7 +56,6 @@ class GAN_trainer:
             self.D_loss_real = checkpoint['D_loss_real']
             self.G_loss_pred = checkpoint['G_loss_pred']
             self.G_loss_diff = checkpoint['G_loss_diff']
-            self.args = checkpoint['args']
             print(f"Model Loaded from '{self.args.load_path}' Successfully!")
         except:
             print(f"Model Load Failed from '{self.args.load_path}'! Using New Initialization!")
@@ -187,7 +186,7 @@ def train(trainer: GAN_trainer):
                 voxes = voxes.to(trainer.args.available_device)
                 labels = labels.to(trainer.args.available_device)  # fixed: device bug
 
-                if trainer.args.global_step % 2 == 0:
+                if trainer.args.global_step % trainer.args.g_steps == 0:
                     trainer.train_G(voxes,frags,labels)
                 trainer.train_D(voxes,frags,labels)
                 
@@ -286,6 +285,7 @@ def main():
     parser.add_argument('--load_path', type=str, help="Where to load the model.",default="")
     parser.add_argument('--save_dir', type=str, help="Where to save the model.",default="models")
     parser.add_argument('--global_step', type=int, help="Global step of training.",default=0)
+    parser.add_argument('--g_steps', type=int, default=2)
     parser.add_argument('--mode', type=str, default="train")
     args = parser.parse_args()
     
