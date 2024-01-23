@@ -12,7 +12,7 @@ from utils.model import Generator, Discriminator
 
 
 def gLossDiff(pred: torch.Tensor, real: torch.Tensor):
-    temp = torch.where(real == 0, pred, 100 * (1 - pred))
+    temp = torch.where(real == 0, pred, 20 * (1 - pred))
     loss = torch.mean(torch.sum(temp, dim=(1, 2, 3)))
     return loss
 
