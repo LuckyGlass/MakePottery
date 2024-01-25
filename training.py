@@ -26,6 +26,7 @@ import argparse
 from test import *
 from matplotlib import pyplot as plt
 from utils.visualize import plot_join, plot
+from utils.pyvox.models import Vox
 
 def gradient_penalty(y_pred, voxel_blend):
     gradients = torch.autograd.grad(outputs=y_pred, inputs=voxel_blend, grad_outputs=torch.ones_like(y_pred), create_graph=True)[0]
@@ -46,7 +47,7 @@ class GAN_trainer:
 
     def load_Model(self):
         try:
-            checkpoint = torch.load(self.args.load_path)
+            checkpoint = torch.load(self.args.load_path,map_location=torch.device('cpu'))
             self.G.load_state_dict(checkpoint['model-G'])
             self.G_optim.load_state_dict(checkpoint['optim-G'])
             self.D.load_state_dict(checkpoint['model-D'])
@@ -171,6 +172,17 @@ class GAN_trainer:
                 plot(gt, os.path.join("testPics", str(cnt) + ".real.png"), False)
                 print(f"Plot {step}, {path}, {torch.max(pred)}")
 
+    def empty_input(self):
+        if not os.path.exists("emptyInput"):
+            os.makedirs("emptyInput")
+        frag = np.zeros((32,32,32))
+        frag = torch.from_numpy(frag)
+        for label in range(0, 11):
+            label = torch.tensor([label])
+            to_plot = self.G(frag.float(), label).reshape(32, 32, 32)
+            to_plot = torch.round(to_plot)
+            #print(to_plot)
+            plot(to_plot,os.path.join("emptyInput","label="+str(label)+".png"), False)
 
 def train(trainer: GAN_trainer):
     # Training loop.
@@ -240,6 +252,8 @@ def debug(trainer: GAN_trainer):
 
     print("Finished training!")
 
+def emptyDraw(trainer: GAN_trainer):
+    trainer.empty_input()
 
 def main():
     '''
@@ -297,6 +311,8 @@ def main():
         test(trainer)
     elif args.mode == "debug":
         debug(trainer)
+    elif args.mode == "empty":  
+        emptyDraw(trainer)
 
 
 if __name__ == "__main__":
@@ -338,4 +354,10 @@ python training.py \
     --mode test \
     --load_path models/GAN3220-240122173034.pt
 python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
+"""
+
+"""
+python training.py \
+    --mode empty \
+    --load_path models/GAN3210-240123000527.pt
 """
