@@ -128,7 +128,7 @@ class GAN_trainer:
             path)
         print(f"Model Saved to {path} Successfully!")
 
-    def draw_loss(self, dir="drive/MyDrive/lossPics"):
+    def draw_loss(self, dir="lossPics"):
         pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
         plt.figure()
         plt.plot(self.G_loss_pred)
@@ -175,14 +175,40 @@ class GAN_trainer:
     def empty_input(self):
         if not os.path.exists("emptyInput"):
             os.makedirs("emptyInput")
-        frag = np.zeros((32,32,32))
-        frag = torch.from_numpy(frag)
-        for label in range(0, 11):
-            label = torch.tensor([label])
-            to_plot = self.G(frag.float(), label).reshape(32, 32, 32)
-            to_plot = torch.round(to_plot)
-            #print(to_plot)
-            plot(to_plot.detach(),os.path.join("emptyInput","label="+str(label)+".png"), False)
+        self.G.eval()
+        with torch.no_grad():
+            frag = np.zeros((32,32,32))
+            frag = torch.from_numpy(frag)
+            for label in range(0, 11):
+                label = torch.tensor([label])
+                to_plot = self.G(frag.float(), label).reshape(32, 32, 32)
+                to_plot = torch.round(to_plot)
+                #print(to_plot)
+                plot(to_plot,os.path.join("emptyInput","label="+str(label)+".png"), False)
+
+    def test_one_voxel(self, idx, show_frag=False):
+        if not os.path.exists("oneVoxelPics"):
+            os.makedirs("oneVoxelPics")
+        train_dataset = FragmentDataset(self.args.test_vox_path, "test", dim_size=self.args.hidden_dim)
+        self.G.eval()
+        with torch.no_grad():
+            for cnt in range(1,15):
+                frag, gt, frag_id, label, path = train_dataset.__getitem_with_frag_num__(idx, cnt)
+                if label == -1:
+                    break
+                gt = gt.reshape(32, 32, 32)
+                frag = torch.from_numpy(frag)
+                path = path[0]
+                pred = self.G(frag.float(), torch.tensor([label])).reshape(32, 32, 32)
+                if show_frag:
+                    to_plot = torch.round(pred) - frag.to('cpu').reshape(32, 32, 32)
+                    plot_join(to_plot, frag.to('cpu').reshape(32, 32, 32), os.path.join("oneVoxelPics", str(cnt) + ".pred.png"), False)
+                else:
+                    to_plot = torch.round(pred)
+                    plot(to_plot, os.path.join("oneVoxelPics", str(cnt) + ".pred.png"), False)
+                plot(gt, os.path.join("oneVoxelPics", str(cnt) + ".real.png"), False)
+            
+
 
 def train(trainer: GAN_trainer):
     # Training loop.
@@ -227,7 +253,7 @@ def train(trainer: GAN_trainer):
 
 def test(trainer: GAN_trainer):
     trainer.test(10, True)
-    
+ 
 
 def debug(trainer: GAN_trainer):
     with Progress() as progress:
@@ -313,6 +339,8 @@ def main():
         debug(trainer)
     elif args.mode == "empty":  
         emptyDraw(trainer)
+    elif args.mode == "oneVoxel":
+        trainer.test_one_voxel(15)
 
 
 if __name__ == "__main__":
@@ -352,12 +380,19 @@ python training.py \
     --batch_size 1 \
     --hidden_dim 32 \
     --mode test \
-    --load_path models/GAN3220-240122173034.pt
+    --load_path models/GAN3210-240123000527.pt
 python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
 """
 
 """
 python training.py \
     --mode empty \
+    --load_path models/GAN3210-240123000527.pt
+"""
+
+"""
+python training.py \
+    --mode oneVoxel \
+    --hidden_dim 32 \
     --load_path models/GAN3210-240123000527.pt
 """
