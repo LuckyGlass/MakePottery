@@ -34,6 +34,11 @@ def gradient_penalty(y_pred, voxel_blend):
     penalty = torch.mean((gradient_norm - 1) ** 2) * 10
     return penalty 
 
+
+def dateTime():
+    return datetime.datetime.now().strftime("%y%m%d%H%M%S")
+
+
 class GAN_trainer:
     def __init__(self, args):
         self.args = args
@@ -129,7 +134,7 @@ class GAN_trainer:
         print(f"Model Saved to {path} Successfully!")
 
     def draw_loss(self, dir="drive/MyDrive/lossPics"):
-        pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
+        pre_title = self.args.model_name + "-" + dateTime()
         plt.figure()
         plt.plot(self.G_loss_pred)
         plt.savefig(os.path.join(dir, f"{pre_title}-G_loss_pred.jpg"))
@@ -218,7 +223,7 @@ def train(trainer: GAN_trainer):
             
             progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
             
-            date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            date = dateTime()
             trainer.save_Model("GAN32" + str(epoch) + "-" + date + ".pt")
             trainer.draw_loss()
 
@@ -247,13 +252,67 @@ def debug(trainer: GAN_trainer):
 
             G_loss_diff = np.mean(trainer.G_loss_diff)
             progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), {G_loss_diff:.2f}...")
-            date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            date = dateTime()
             trainer.save_Model("debug" + str(epoch) + "-" + date + ".pt")
 
     print("Finished training!")
 
+
 def emptyDraw(trainer: GAN_trainer):
     trainer.empty_input()
+
+
+def drawMetric(recalls, precisions, save_dir):
+    date = dateTime()
+    plt.cla()
+    # Draw recalls
+    xs = []
+    ys = []
+    name = "recall-" + date + ".png"
+    for key, value in recalls.items():
+        xs.append(key)
+        ys.append(np.mean(value))
+    plt.plot(xs, ys)
+    plt.savefig(os.path.join(save_dir, name))
+    plt.cla()
+    xs = []
+    ys = []
+    name = "precision-" + date + ".png"
+    for key, value in precisions.items():
+        xs.append(key)
+        ys.append(np.mean(value))
+    plt.plot(xs, ys)
+    plt.savefig(os.path.join(save_dir, name))
+    plt.cla()
+
+    
+def metric(trainer: GAN_trainer):
+    assert trainer.args.batch_size == 1
+    import pickle
+    mem_recalls = {}
+    mem_precisions = {}
+    with torch.no_grad():
+        trainer.G.eval()
+        for epoch in range(trainer.args.epochs):
+            for frag, real, frag_id, label, path in trainer.test_dataloader:
+                frag = frag.to(trainer.args.available_device)
+                real = real.to(trainer.args.available_device)
+                label = label.to(trainer.args.available_device)
+                pred = trainer.G(frag, label)
+                recall, precision = recallAndPrecision(pred, real)
+                num_frags = torch.sum(frag_id).item()
+                total_frags = len(torch.unique(real))
+                rate = num_frags / total_frags
+                if rate not in mem_recalls:
+                    mem_recalls[rate] = []
+                    mem_precisions[rate] = []
+                mem_recalls[rate].append(recall)
+                mem_precisions[rate].append(precision)
+    name = "rap-" + dateTime() + ".pkl"
+    with open(os.path.join(trainer.args.save_dir, name), "wb") as f:
+        pickle.dump({"mem_recalls": mem_recalls, "mem_precision": mem_precisions}, f)
+    drawMetric(mem_recalls, mem_precisions, trainer.args.save_dir)
+
 
 def main():
     '''
@@ -313,6 +372,8 @@ def main():
         debug(trainer)
     elif args.mode == "empty":  
         emptyDraw(trainer)
+    elif args.mode == "metric":
+        metric(trainer)
 
 
 if __name__ == "__main__":
@@ -360,4 +421,13 @@ python training.py --train_vox_path data\train --test_vox_path data\test --epoch
 python training.py \
     --mode empty \
     --load_path models/GAN3210-240123000527.pt
+"""
+
+"""
+Draw the metrics:
+python training.py \
+    --mode metric \
+    --load_path models/GAN3210-240123000527.pt \
+    --batch_size 1 \
+    --save_dir testPics
 """
