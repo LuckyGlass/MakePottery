@@ -128,7 +128,7 @@ class GAN_trainer:
             path)
         print(f"Model Saved to {path} Successfully!")
 
-    def draw_loss(self, dir="lossPics"):
+    def draw_loss(self, dir="drive/MyDrive/lossPics"):
         pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
         plt.figure()
         plt.plot(self.G_loss_pred)
