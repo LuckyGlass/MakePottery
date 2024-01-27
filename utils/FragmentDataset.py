@@ -75,14 +75,15 @@ class FragmentDataset(Dataset):
         factor = int(64/self.dim_size)
         return vox[::factor, ::factor, ::factor]
 
-    def __select_fragment__(self, voxel):
+    def __select_fragment__(self, voxel, select_num=0):
         # randomly select several pieces(not all) in voxel
         # return selected voxel and the random id select_frag
         # hint: find all voxel ids from voxel, and randomly pick one as fragmented data (hint: refer to function below)
         # TODO
         frag_id = np.unique(voxel)[1:]
         # Decide the number of fragments, at least one and not all.
-        select_num = np.random.choice(np.arange(1, len(frag_id)))
+        if select_num==0:
+            select_num = np.random.choice(np.arange(1, len(frag_id)))
         select_frag = np.random.choice(frag_id, select_num)
         for f in frag_id:
             if f in select_frag:
@@ -129,7 +130,24 @@ class FragmentDataset(Dataset):
         select_frag_embed = torch.zeros(20)
         select_frag_embed[select_frag] = 1
         return frag, vox, select_frag_embed, int(label)-1, img_path
-
+    
+    def __getitem_with_frag_num__(self, idx, frag_num):
+        img_path = self.vox_files[idx]
+        label = os.path.basename(os.path.dirname(img_path))
+        vox = self.__read_vox__(img_path)
+        frag_id = np.unique(vox)[1:]
+        # Decide the number of fragments, at least one and not all.
+        if frag_num >= len(frag_id):
+            return -1,-1,-1,-1,-1
+        frag = np.copy(vox)
+        frag, select_frag = self.__select_fragment__(frag, frag_num)
+        if self.transform is not None:
+            vox = self.transform(vox)
+            frag = self.transform(frag)
+        select_frag_embed = torch.zeros(20)
+        select_frag_embed[select_frag] = 1
+        return frag, vox, select_frag_embed, int(label)-1, img_path
+    
     def __getitem_specific_frag__(self, idx, select_frag):
         # TODO
         # implement by yourself, similar to __getitem__ but designate frag_id

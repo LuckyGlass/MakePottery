@@ -47,12 +47,6 @@ class GAN_trainer:
             checkpoint = torch.load(self.args.load_path)
             self.G.load_state_dict(checkpoint['model-G'])
             self.G_optim.load_state_dict(checkpoint['optim-G'])
-            self.D.load_state_dict(checkpoint['model-D'])
-            self.D_optim.load_state_dict(checkpoint['optim-D'])
-            self.D_loss_grad = checkpoint['D_loss_grad']
-            self.D_loss_fake = checkpoint['D_loss_fake']
-            self.D_loss_real = checkpoint['D_loss_real']
-            self.G_loss_pred = checkpoint['G_loss_pred']
             self.G_loss_diff = checkpoint['G_loss_diff']
             print(f"Model Loaded from '{self.args.load_path}' Successfully!")
         except:
@@ -62,7 +56,7 @@ class GAN_trainer:
         train_dataset = FragmentDataset(self.args.train_vox_path, "train", dim_size=self.args.hidden_dim)
         test_dataset = FragmentDataset(self.args.test_vox_path, "test", dim_size=self.args.hidden_dim)
         self.train_dataloader = data.DataLoader(train_dataset, batch_size=self.args.batch_size, shuffle=True)
-        self.test_dataloader = data.DataLoader(test_dataset, batch_size=self.args.batch_size, shuffle=True)
+        self.test_dataloader = data.DataLoader(test_dataset, batch_size=1, shuffle=True)
         print("Data Loaded Successfully!")
 
     def init_Loss(self):
@@ -73,21 +67,6 @@ class GAN_trainer:
         b = voxel_fake.shape[0]
         alpha = torch.rand(b,1,1,1).to(self.args.available_device)
         return alpha * voxel_fake + (1 - alpha) * voxel_real
-
-    def train_D(self, voxel_whole, voxel_frag, label):
-        self.D_optim.zero_grad()
-        self.G_optim.zero_grad()
-        voxel_pred = self.G(voxel_frag, label)
-        voxel_blend = self.blend(voxel_pred, voxel_whole).requires_grad_(True)
-        loss_real = self.D_loss1(self.D(voxel_whole,label))
-        loss_fake = self.D_loss2(self.D(voxel_pred,label))
-        loss_grad = self.D_loss3(self.D(voxel_blend,label),voxel_blend)
-        self.D_loss_fake.append(loss_fake.item())
-        self.D_loss_real.append(loss_real.item())
-        self.D_loss_grad.append(loss_grad.item())
-        loss = loss_real + loss_fake + loss_grad
-        loss.backward()
-        self.D_optim.step()
 
     def train_G(self, voxel_whole, voxel_frag, label):
         voxel_pred = self.G(voxel_frag, label)
@@ -103,13 +82,7 @@ class GAN_trainer:
         torch.save({
             'model-G':self.G.state_dict(),
             'optim-G':self.G_optim.state_dict(),
-            'model-D':self.D.state_dict(),
-            'optim-D':self.D_optim.state_dict(),
             'G_loss_diff':self.G_loss_diff,
-            'G_loss_pred':self.G_loss_pred,
-            'D_loss_fake':self.D_loss_fake,
-            'D_loss_real':self.D_loss_real,
-            'D_loss_grad':self.D_loss_grad
             }, 
             path)
         print(f"Model Saved to {path} Successfully!")
@@ -139,11 +112,11 @@ class GAN_trainer:
                 pred = self.G(frag, label).to('cpu').reshape(32, 32, 32)
                 if show_frag:
                     to_plot = torch.round(pred) - frag.to('cpu').reshape(32, 32, 32)
-                    plot_join(to_plot, frag.to('cpu').reshape(32, 32, 32), os.path.join("testPics", str(epoch) + str(cnt) + ".pred.png"), False)
+                    plot_join(to_plot, frag.to('cpu').reshape(32, 32, 32), os.path.join("testPics", str(epoch) +'-'+ str(cnt) + ".pred.png"), False)
                 else:
                     to_plot = torch.round(pred)
                     plot(to_plot, os.path.join("testPics", str(cnt) + ".pred.png"), False)
-                plot(gt, os.path.join("testPics", str(epoch) + str(cnt) + ".real.png"), False)
+                plot(gt, os.path.join("testPics", str(epoch) +'-'+ str(cnt) + ".real.png"), False)
                 print(f"Plot {step}, {path}, {torch.max(pred)}")
 
 
@@ -269,10 +242,10 @@ if __name__ == "__main__":
     main()
 
 """
-python training.py \
+python trainingVAE.py \
     --train_vox_path data/train \
     --test_vox_path data/test \
-    --epochs 20 \
+    --epochs 5 \
     --batch_size 16 \
     --hidden_dim 32 \
     --mode train \
