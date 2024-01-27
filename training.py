@@ -210,17 +210,17 @@ def train(trainer: GAN_trainer):
 
                 progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.train_dataloader)-1}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
 
-                D_loss_fake = np.mean(trainer.D_loss_fake)
-                D_loss_real = np.mean(trainer.D_loss_real)
-                D_loss_grad = np.mean(trainer.D_loss_grad)
-                G_loss_pred = np.mean(trainer.G_loss_pred)
-                G_loss_diff = np.mean(trainer.G_loss_diff)
-                
-                progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
-                
-                date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
-                trainer.save_Model("GAN32" + str(epoch) + "-" + date + ".pt")
-                trainer.draw_loss()
+            D_loss_fake = np.mean(trainer.D_loss_fake)
+            D_loss_real = np.mean(trainer.D_loss_real)
+            D_loss_grad = np.mean(trainer.D_loss_grad)
+            G_loss_pred = np.mean(trainer.G_loss_pred)
+            G_loss_diff = np.mean(trainer.G_loss_diff)
+            
+            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
+            
+            date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            trainer.save_Model("GAN32" + str(epoch) + "-" + date + ".pt")
+            trainer.draw_loss()
 
     print("Finished training!")
 
