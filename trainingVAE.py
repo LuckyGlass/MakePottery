@@ -180,6 +180,71 @@ def debug(trainer: GAN_trainer):
     print("Finished training!")
 
 
+def dateTime():
+    return datetime.datetime.now().strftime("%y%m%d%H%M%S")
+
+
+def drawMetric(recalls, precisions, save_dir):
+    date = dateTime()
+    plt.cla()
+    # Draw recalls
+    data = [(key, np.mean(value)) for key, value in recalls.items()]
+    data.sort()
+    name = "recall-" + date + ".png"
+    xs, ys = [], []
+    for key, value in data:
+        xs.append(key)
+        ys.append(value)
+    plt.plot(xs, ys)
+    plt.savefig(os.path.join(save_dir, name))
+    plt.cla()
+    # Draw precisions
+    data = [(key, np.mean(value)) for key, value in precisions.items()]
+    data.sort()
+    name = "precision-" + date + ".png"
+    xs, ys = [], []
+    for key, value in data:
+        xs.append(key)
+        ys.append(value)
+    plt.plot(xs, ys)
+    plt.savefig(os.path.join(save_dir, name))
+    plt.cla()
+
+    
+def metric(trainer: GAN_trainer):
+    assert trainer.args.batch_size == 1
+    import pickle
+    mem_recalls = {}
+    mem_precisions = {}
+    with torch.no_grad():
+        trainer.G.eval()
+        with Progress() as progress:
+            task1 = progress.add_task(f"[red]Epoch Training({0}/{trainer.args.epochs})...",total=trainer.args.epochs)
+            for epoch in range(1, trainer.args.epochs + 1):
+                task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(trainer.train_dataloader)-1})...",total=len(trainer.test_dataloader)-1)
+                for step, (frag, real, frag_id, label, path) in enumerate(trainer.test_dataloader):
+                    frag = frag.to(trainer.args.available_device)
+                    real = real.to(trainer.args.available_device)
+                    label = label.to(trainer.args.available_device)
+                    pred = trainer.G(frag, label)
+                    recall, precision = recallAndPrecision(pred, real)
+                    num_frags = torch.sum(frag_id).item()
+                    total_frags = len(torch.unique(real))
+                    rate = num_frags / total_frags
+                    if rate not in mem_recalls:
+                        mem_recalls[rate] = []
+                        mem_precisions[rate] = []
+                    mem_recalls[rate].append(recall.item())
+                    mem_precisions[rate].append(precision.item())
+                    progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.test_dataloader)-1})...")
+                progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs})...")
+
+    name = "rap-" + dateTime() + ".pkl"
+    with open(os.path.join(trainer.args.save_dir, name), "wb") as f:
+        pickle.dump({"mem_recalls": mem_recalls, "mem_precision": mem_precisions}, f)
+    drawMetric(mem_recalls, mem_precisions, trainer.args.save_dir)
+
+
 def main():
     '''
     ### Here is a simple demonstration argparse, you may customize your own implementations, and
