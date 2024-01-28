@@ -41,7 +41,8 @@ class Conv3DforD(torch.nn.Module):
     def forward(self, x):
         x = self.c1(x)
         x = self.ac(x)
-        x = self.se(x)
+        if self.se:
+            x = self.se(x)
         return x
     
 
@@ -203,8 +204,6 @@ class Generator32(torch.nn.Module):
             torch.nn.Sigmoid(),  # fix: Tanh -> Sigmoid
         )
 
-    def randomOut(self, feature, label):
-        pass
     
     def forward(self, voxel, label):
         # you may also find torch.view() useful
@@ -252,26 +251,31 @@ class Generator64(torch.nn.Module):
 
         # convert
         # 64^3 * 1   -> 32^3 * 32
-        self.encoder00 = Conv3DforG(1,32,5,2,3)
+        self.encoder00 = Conv3DforG(1,32,4,2,1)
         # 32^3 * 32  -> 32^3 * 1
-        self.encoder01 = Conv3DforG(32,1,4,2,1,False)
+        self.encoder01 = Conv3DforG(32,1,5,1,2,False)
         # 32^3 * 1   -> 32^3 * 1
         self.gan32 = Generator32()
         # 32^3 * 1   -> 32^3 * 32
-        self.decoder00 = TransConv3DforG(1,32,4,2,1)
+        self.decoder00 = TransConv3DforG(1,32,5,1,2)
         # 32^3 * 32  -> 64^3 * 1
         self.decoder01 = torch.nn.Sequential(
-            torch.nn.ConvTranspose3d(32, 1, 5, 2, 3),
+            torch.nn.ConvTranspose3d(32, 1, 4, 2, 1),
             torch.nn.Sigmoid(),  # fix: Tanh -> Sigmoid
         )
 
     def forward(self,voxel, label):
-        voxel = voxel.reshape(-1, 1, 64, 64, 64)
+        voxel = voxel.reshape(-1, 1, 64, 64, 64) #fixed
         v = self.encoder00(voxel)
         v = self.encoder01(v)
+        # print(v.shape)
         out = self.gan32(v, label)
+        out = out.reshape(-1,1,32,32,32)
         out = self.decoder00(out)
         out = self.decoder01(out)
+        out = out.reshape(-1,64,64,64)
+        voxel = voxel.reshape(-1,64,64,64)
+        out = torch.where(voxel == 1, 1, out)
         return out
     
 class Discriminator64(torch.nn.Module):
@@ -280,18 +284,19 @@ class Discriminator64(torch.nn.Module):
 
         # convert
         # 64^3 * 1   -> 32^3 * 32
-        self.encoder00 = Conv3DforD(1,32,5,2,3)
+        self.encoder00 = Conv3DforD(1,32,4,2,1)
         # 32^3 * 32  -> 32^3 * 1
-        self.encoder01 = Conv3DforD(32,1,4,2,1,False)
+        self.encoder01 = Conv3DforD(32,1,5,1,2,False)
         # 32^3 * 1   -> 1
         self.gan32 = Discriminator32()
 
-    def forward(self,voxel, label):
+    def forward(self,voxel,label):
         voxel = voxel.reshape(-1, 1, 64, 64, 64)
         v = self.encoder00(voxel)
         v = self.encoder01(v)
+        # print(v.shape)
         out = self.gan32(v, label)
         return out
 
-Generator = Generator32
-Discriminator = Discriminator32
+Generator = Generator64
+Discriminator = Discriminator64

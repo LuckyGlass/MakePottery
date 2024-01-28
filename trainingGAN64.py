@@ -39,7 +39,9 @@ class GAN_trainer:
         self.load_Data()
         self.init_Loss()
         self.G = Generator().to(self.args.available_device)
+        self.D = Discriminator().to(self.args.available_device)
         self.G_optim = optim.AdamW(self.G.parameters(), lr=self.args.g_lr, betas=(self.args.g_beta1, self.args.g_beta2), eps=self.args.g_eps, weight_decay=self.args.g_weight_decay)
+        self.D_optim = optim.AdamW(self.D.parameters(), lr=self.args.d_lr, betas=(self.args.d_beta1, self.args.d_beta2), eps=self.args.d_eps, weight_decay=self.args.d_weight_decay)
         self.load_Model()
 
     def load_Model(self):
@@ -47,6 +49,12 @@ class GAN_trainer:
             checkpoint = torch.load(self.args.load_path)
             self.G.load_state_dict(checkpoint['model-G'])
             self.G_optim.load_state_dict(checkpoint['optim-G'])
+            self.D.load_state_dict(checkpoint['model-D'])
+            self.D_optim.load_state_dict(checkpoint['optim-D'])
+            self.D_loss_grad = checkpoint['D_loss_grad']
+            self.D_loss_fake = checkpoint['D_loss_fake']
+            self.D_loss_real = checkpoint['D_loss_real']
+            self.G_loss_pred = checkpoint['G_loss_pred']
             self.G_loss_diff = checkpoint['G_loss_diff']
             print(f"Model Loaded from '{self.args.load_path}' Successfully!")
         except:
@@ -61,19 +69,45 @@ class GAN_trainer:
 
     def init_Loss(self):
         self.G_loss1 = gLossDiff                            # should converge to 0
+        self.G_loss2 = lambda y_pred: torch.mean(y_pred)    # should converge to ??
+        self.D_loss1 = lambda y_pred: torch.mean(y_pred)    # should converge to ??
+        self.D_loss2 = lambda y_pred: -torch.mean(y_pred)   # should converge to ??
+        self.D_loss3 = gradient_penalty                     # should converge to 0
+        self.D_loss_fake = []
+        self.D_loss_real = []
+        self.D_loss_grad = []
         self.G_loss_diff = []
+        self.G_loss_pred = []
 
     def blend(self, voxel_fake, voxel_real):
         b = voxel_fake.shape[0]
         alpha = torch.rand(b,1,1,1).to(self.args.available_device)
         return alpha * voxel_fake + (1 - alpha) * voxel_real
 
+    def train_D(self, voxel_whole, voxel_frag, label):
+        self.D_optim.zero_grad()
+        self.G_optim.zero_grad()
+        voxel_pred = self.G(voxel_frag, label)
+        voxel_blend = self.blend(voxel_pred, voxel_whole).requires_grad_(True)
+        loss_real = self.D_loss1(self.D(voxel_whole,label))
+        loss_fake = self.D_loss2(self.D(voxel_pred,label))
+        loss_grad = self.D_loss3(self.D(voxel_blend,label),voxel_blend)
+        self.D_loss_fake.append(loss_fake.item())
+        self.D_loss_real.append(loss_real.item())
+        self.D_loss_grad.append(loss_grad.item())
+        loss = loss_real + loss_fake + loss_grad
+        loss.backward()
+        self.D_optim.step()
+
     def train_G(self, voxel_whole, voxel_frag, label):
         voxel_pred = self.G(voxel_frag, label)
+        self.D_optim.zero_grad()
         self.G_optim.zero_grad()
         loss_diff = self.G_loss1(voxel_pred, voxel_whole)
+        loss_pred = self.G_loss2(self.D(voxel_pred,label))
         self.G_loss_diff.append(loss_diff.item())
-        loss = loss_diff
+        self.G_loss_pred.append(loss_pred.item())
+        loss = loss_diff + loss_pred
         loss.backward()
         self.G_optim.step()
 
@@ -82,16 +116,34 @@ class GAN_trainer:
         torch.save({
             'model-G':self.G.state_dict(),
             'optim-G':self.G_optim.state_dict(),
+            'model-D':self.D.state_dict(),
+            'optim-D':self.D_optim.state_dict(),
             'G_loss_diff':self.G_loss_diff,
+            'G_loss_pred':self.G_loss_pred,
+            'D_loss_fake':self.D_loss_fake,
+            'D_loss_real':self.D_loss_real,
+            'D_loss_grad':self.D_loss_grad
             }, 
             path)
         print(f"Model Saved to {path} Successfully!")
 
-    def draw_loss(self, dir="lossPics"):
-        pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
+    def draw_loss(self, epoch, dir="lossPics"):
+        pre_title = self.args.model_name + "-" + str(epoch) + '-' + datetime.datetime.now().strftime("%y%m%d%H%M%S")
         plt.figure()
+        plt.plot(self.G_loss_pred)
+        plt.savefig(os.path.join(dir, f"{pre_title}-G_loss_pred.jpg"))
+        plt.cla()
         plt.plot(self.G_loss_diff)
         plt.savefig(os.path.join(dir, f"{pre_title}-G_loss_diff.jpg"))
+        plt.cla()
+        plt.plot(self.D_loss_fake)
+        plt.savefig(os.path.join(dir, f"{pre_title}-D_loss_fake.jpg"))
+        plt.cla()
+        plt.plot(self.D_loss_real)
+        plt.savefig(os.path.join(dir, f"{pre_title}-D_loss_real.jpg"))
+        plt.cla()
+        plt.plot(self.D_loss_grad)
+        plt.savefig(os.path.join(dir, f"{pre_title}-D_loss_grad.jpg"))
         plt.cla()
         
     def test(self, epoch=-1, limit=-1, show_frag=False):
@@ -103,16 +155,16 @@ class GAN_trainer:
             for step, (frag, gt, frag_id, label, path) in enumerate(self.test_dataloader):
                 if limit >= 0 and step >= limit:
                     break
-                gt = gt.reshape(32, 32, 32)
+                gt = gt.reshape(64, 64, 64)
                 frag = frag.to(self.args.available_device)
                 label = label.to(self.args.available_device)
                 path = path[0]
 
                 cnt += 1
-                pred = self.G(frag, label).to('cpu').reshape(32, 32, 32)
+                pred = self.G(frag, label).to('cpu').reshape(64, 64, 64)
                 if show_frag:
-                    to_plot = torch.round(pred) - frag.to('cpu').reshape(32, 32, 32)
-                    plot_join(to_plot, frag.to('cpu').reshape(32, 32, 32), os.path.join("testPics", str(epoch) +'-'+ str(cnt) + ".pred.png"), False)
+                    to_plot = torch.round(pred) - frag.to('cpu').reshape(64, 64, 64)
+                    plot_join(to_plot, frag.to('cpu').reshape(64, 64, 64), os.path.join("testPics", str(epoch) +'-'+ str(cnt) + ".pred.png"), False)
                 else:
                     to_plot = torch.round(pred)
                     plot(to_plot, os.path.join("testPics", str(cnt) + ".pred.png"), False)
@@ -129,24 +181,35 @@ def train(trainer: GAN_trainer):
             task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(trainer.train_dataloader)-1})...",total=len(trainer.train_dataloader)-1)
 
             for step, (frags, voxes, frag_ids, labels, paths) in enumerate(trainer.train_dataloader):
+                
                 trainer.args.global_step += 1
                 frags = frags.to(trainer.args.available_device)
                 voxes = voxes.to(trainer.args.available_device)
                 labels = labels.to(trainer.args.available_device)  # fixed: device bug
 
-                trainer.train_G(voxes,frags,labels)
+                if trainer.args.global_step % trainer.args.g_steps == 0:
+                    trainer.train_G(voxes,frags,labels)
+                trainer.train_D(voxes,frags,labels)
                 
+                D_loss_fake = float("inf") if len(trainer.D_loss_fake) == 0 else trainer.D_loss_fake[-1]
+                D_loss_real = float("inf") if len(trainer.D_loss_real) == 0 else trainer.D_loss_real[-1]
+                D_loss_grad = float("inf") if len(trainer.D_loss_grad) == 0 else trainer.D_loss_grad[-1]
+                G_loss_pred = float("inf") if len(trainer.G_loss_pred) == 0 else trainer.G_loss_pred[-1]
                 G_loss_diff = float("inf") if len(trainer.G_loss_diff) == 0 else trainer.G_loss_diff[-1]
 
-                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.train_dataloader)-1}), ({G_loss_diff:.2f})...")
+                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.train_dataloader)-1}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
 
+            D_loss_fake = np.mean(trainer.D_loss_fake)
+            D_loss_real = np.mean(trainer.D_loss_real)
+            D_loss_grad = np.mean(trainer.D_loss_grad)
+            G_loss_pred = np.mean(trainer.G_loss_pred)
             G_loss_diff = np.mean(trainer.G_loss_diff)
             
-            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), ({G_loss_diff:.2f})...")
+            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
             
             date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
-            trainer.save_Model("VAE" + str(epoch) + "-" + date + ".pt")
-            trainer.draw_loss()
+            trainer.save_Model("GAN64-" + str(epoch) + "-" + date + ".pt")
+            trainer.draw_loss(epoch)
             trainer.test(epoch,10,True)
 
     print("Finished training!")
@@ -241,40 +304,37 @@ def main():
 if __name__ == "__main__":
     main()
 
+
+
 """
-python trainingVAE.py \
+
+python trainingGAN64.py \
     --train_vox_path data/train \
     --test_vox_path data/test \
     --epochs 5 \
     --batch_size 16 \
-    --hidden_dim 32 \
-    --mode train \
-    --g_lr 1e-3 \
-    --d_lr 1e-5
-python training.py \
-    --train_vox_path data/train \
-    --test_vox_path data/test \
-    --epochs 3 \
-    --batch_size 16 \
-    --hidden_dim 32 \
-    --mode debug \
-    --g_lr 1e-2
-python training.py \
-    --train_vox_path data/train \
-    --test_vox_path data/test \
-    --epochs 20 \
-    --batch_size 16 \
-    --hidden_dim 32 \
+    --hidden_dim 64 \
     --mode train \
     --g_lr 1e-3 \
     --d_lr 1e-5 \
-    --load_path models/GAN3220-240122133954.pt
-python training.py \
+    --model_name gan64
+
+    
+"""
+
+
+"""
+
+python trainingGAN64.py \
     --train_vox_path data/train \
-    --test_vox_path data/train \
-    --batch_size 1 \
-    --hidden_dim 32 \
-    --mode test \
-    --load_path models/GAN3220-240122173034.pt
-python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
+    --test_vox_path data/test \
+    --epochs 15 \
+    --batch_size 16 \
+    --hidden_dim 64 \
+    --mode train \
+    --g_lr 1e-3 \
+    --d_lr 1e-5 \
+    --model_name gan64 \
+    --load_path models1/GAN64-5-240128112720.pt
+    
 """
