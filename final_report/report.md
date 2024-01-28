@@ -5,8 +5,16 @@
 # Part3 Methods【复用+64】【mys-loss设置】
 【模型】【配图：论文的图片（复用）】
 # Part4 Experiments
-1. 【具体的参数怎么设置、训练过程】【mys】
-2. Ablation Study【控制变量/对比实验】
+## 1. Training details
+We used the AdamW optimizer by default. Except the learning rates, the arguments of AdamW were set to the default setting. We trained the model in 3 stages.
+
+In 1st stage, we set both the learning rates of the generator and the discriminator to $1\times10^{-5}$ and trained the GAN for $20$ epochs. The generator was trained every $3$ steps and the discriminator was trained every step. And the $\mathrm{DiffLoss}$ loss of the generator was not scaled in this stage.
+
+In 2nd stage, we set the learning rate of the generator to $1\times10^{-3}$ and the learning rate of the discriminator to $1\times10^{-5}$ and trained the GAN for $20$ epochs. The generator was trained every $2$ steps and the discriminator was trained every step. In this stage, we magnified the weights of the non-empty voxels $100$ times.
+
+In 3rd stage, the parameter setting was the same as that in 2nd stage, except that we magnified the weights of the non-empty voxels $20$ times and trained the GAN for only $10$ epochs.
+
+1. Ablation Study【控制变量/对比实验】
 	1. 测试输入为空，输出的结果是什么【xly】
 		1. 【一个配图】
 	2. 测试只训练gan的G部分，是否可以恢复模型【wmq】
