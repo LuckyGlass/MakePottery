@@ -29,11 +29,14 @@ class SE(torch.nn.Module):
         return x * y
     
 class Conv3DforD(torch.nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, se=True):
         super(Conv3DforD, self).__init__()
         self.c1 = torch.nn.Conv3d(in_channels, out_channels, kernel_size, stride, padding)
         self.ac = torch.nn.LeakyReLU(0.2)
-        self.se = SE(out_channels)
+        if se:
+            self.se = SE(out_channels)
+        else:
+            self.se = None
 
     def forward(self, x):
         x = self.c1(x)
@@ -43,18 +46,22 @@ class Conv3DforD(torch.nn.Module):
     
 
 class Conv3DforG(torch.nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, se=True):
         super(Conv3DforG, self).__init__()
         self.c1 = torch.nn.Conv3d(in_channels, out_channels, kernel_size, stride, padding)
         self.bn = torch.nn.BatchNorm3d(out_channels)
         self.ac = torch.nn.ReLU()
-        self.se = SE(out_channels)
+        if se:
+            self.se = SE(out_channels)
+        else:
+            self.se = None
 
     def forward(self, x):
         x = self.c1(x)
         x = self.bn(x)
         x = self.ac(x)
-        x = self.se(x)
+        if self.se is not None:
+            x = self.se(x)
         return x
     
 class TransConv3DforG(torch.nn.Module):
@@ -196,6 +203,8 @@ class Generator32(torch.nn.Module):
             torch.nn.Sigmoid(),  # fix: Tanh -> Sigmoid
         )
 
+    def randomOut(self, feature, label):
+        pass
     
     def forward(self, voxel, label):
         # you may also find torch.view() useful
@@ -236,6 +245,53 @@ class Generator32(torch.nn.Module):
         out = torch.where(voxel == 1, 1, out)
         return out
     
+
+class Generator64(torch.nn.Module):
+    def __init__(self):
+        super(Generator64, self).__init__()
+
+        # convert
+        # 64^3 * 1   -> 32^3 * 32
+        self.encoder00 = Conv3DforG(1,32,5,2,3)
+        # 32^3 * 32  -> 32^3 * 1
+        self.encoder01 = Conv3DforG(32,1,4,2,1,False)
+        # 32^3 * 1   -> 32^3 * 1
+        self.gan32 = Generator32()
+        # 32^3 * 1   -> 32^3 * 32
+        self.decoder00 = TransConv3DforG(1,32,4,2,1)
+        # 32^3 * 32  -> 64^3 * 1
+        self.decoder01 = torch.nn.Sequential(
+            torch.nn.ConvTranspose3d(32, 1, 5, 2, 3),
+            torch.nn.Sigmoid(),  # fix: Tanh -> Sigmoid
+        )
+
+    def forward(self,voxel, label):
+        voxel = voxel.reshape(-1, 1, 64, 64, 64)
+        v = self.encoder00(voxel)
+        v = self.encoder01(v)
+        out = self.gan32(v, label)
+        out = self.decoder00(out)
+        out = self.decoder01(out)
+        return out
     
+class Discriminator64(torch.nn.Module):
+    def __init__(self):
+        super(Discriminator64, self).__init__()
+
+        # convert
+        # 64^3 * 1   -> 32^3 * 32
+        self.encoder00 = Conv3DforD(1,32,5,2,3)
+        # 32^3 * 32  -> 32^3 * 1
+        self.encoder01 = Conv3DforD(32,1,4,2,1,False)
+        # 32^3 * 1   -> 1
+        self.gan32 = Discriminator32()
+
+    def forward(self,voxel, label):
+        voxel = voxel.reshape(-1, 1, 64, 64, 64)
+        v = self.encoder00(voxel)
+        v = self.encoder01(v)
+        out = self.gan32(v, label)
+        return out
+
 Generator = Generator32
 Discriminator = Discriminator32

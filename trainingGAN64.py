@@ -119,15 +119,6 @@ class GAN_trainer:
                 plot(gt, os.path.join("testPics", str(epoch) +'-'+ str(cnt) + ".real.png"), False)
                 print(f"Plot {step}, {path}, {torch.max(pred)}")
 
-    def empty(self):
-        for label in range(1,11):
-            frag = np.zeros((32,32,32))
-            
-            pred = self.G(frag, label).to('cpu').reshape(32, 32, 32)
-            to_plot = torch.round(pred)
-            plot(to_plot, os.path.join("testPics", str(label) + ".pred.png"), False)
-            print(f"Plot {0}, {label}, {torch.max(pred)}")
-
 
 def train(trainer: GAN_trainer):
     # Training loop.
@@ -162,8 +153,8 @@ def train(trainer: GAN_trainer):
 
 
 def test(trainer: GAN_trainer):
-    # trainer.test(10, True)
-    trainer.empty()    
+    trainer.test(10, True)
+    
 
 def debug(trainer: GAN_trainer):
     with Progress() as progress:
@@ -286,10 +277,4 @@ python training.py \
     --mode test \
     --load_path models/GAN3220-240122173034.pt
 python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
-"""
-
-"""
-
-python trainingVAE.py --mode test --load_path models\VAE5-240126222415.pt
-
 """
