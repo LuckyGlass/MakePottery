@@ -58,8 +58,8 @@ The generator is built as the picture shown: In the first branch we use 1 Encode
 <center><b>picture in the paper</b></center>
 
 There're 2 points to note in this model: 
-1. Every encoder follows not only the 'Conv-Act-Norm' paradiam, but also follows a SE-layer. Decoders are the same except for replacing the 'Conv-layer' with 'TransConv-layer'. Details parameters are in the picture.
-2. The generator use 'skip connection' technique which means directly concatenanting one feature map with a very late feature map. 
+1. Every encoder follows not only the 'Conv-Act-Norm' paradigm, but also follows a SE-layer. Decoders are the same except for replacing the 'Conv-layer' with 'TransConv-layer'. Details parameters are in the picture.
+2. The generator use 'skip connection' technique which means directly concatenating one feature map with a very late feature map. 
 # Part4 Experiments
 1. 【具体的参数怎么设置、训练过程】【mys】
 2. Ablation Study【控制变量/对比实验】
