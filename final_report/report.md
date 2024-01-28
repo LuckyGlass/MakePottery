@@ -22,10 +22,26 @@ In 3rd stage, the parameter setting was the same as that in 2nd stage, except th
 	3. 测试给gan的G部分的decoder投一个随机项链，是否可以生成结果【wmq】
 		1. 【一个配图】
 # Part5 results analysis
-1. 通过指标比较两组模型的效果（wmq交两个模型，mys分析效果）
-	1. ‘VAE vs GAN32 vs GAN64’
-		1. 【一个表格】
-2. title
+## 5.1. VAE vs GAN32 vs GAN64
+We used the VAE model as the baseline and analyzed the performance of GAN32 and GAN64.
+
+The VAE architecture was the same as the generator of GAN32. And it was trained with L1loss of the differences of the prediction and the ground-truth.
+
+We tested the three models on the test dataset, in which we randomly selected frags and combined them as the inputs. The random seed was fixed and thus it was guaranteed that the test data fed to the models were the same.
+
+We computed three metrics to analyze the performance of the models. Let $Y$ be the ground-truth and $P$ the prediction.
+1. L1loss, the average number of mis-predicted voxels.
+2. Recall, $\mathrm{Recall}=\frac{|P\cap Y|}{|Y|}$.
+3. Precision, $\mathrm{Precision}=\frac{|P\cap Y|}{|P|}$.
+
+
+| Model | L1loss | Average Recall | Average Precision |
+|:---:|:---:|:---:|:---:|
+| VAE | | | |
+| GAN32 | | | |
+| GAN64 | | | |
+
+1. title
 	1. 测试同一个成品，随着输入碎片的数量增加，输出模型的变化【xly】
 		1. 【一个表格+一个配图】
 # Part6 Conclusion【mys】
