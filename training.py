@@ -307,6 +307,7 @@ def metric(trainer: GAN_trainer):
     import pickle
     mem_recalls = {}
     mem_precisions = {}
+    mem_l1s = {}
     with torch.no_grad():
         trainer.G.eval()
         with Progress() as progress:
@@ -319,20 +320,23 @@ def metric(trainer: GAN_trainer):
                     label = label.to(trainer.args.available_device)
                     pred = trainer.G(frag, label)
                     recall, precision = recallAndPrecision(pred, real)
+                    l1 = metricL1(pred, real)
                     num_frags = torch.sum(frag_id).item()
                     total_frags = len(torch.unique(real))
                     rate = num_frags / total_frags
                     if rate not in mem_recalls:
                         mem_recalls[rate] = []
                         mem_precisions[rate] = []
+                        mem_l1s[rate] = []
                     mem_recalls[rate].append(recall.item())
                     mem_precisions[rate].append(precision.item())
+                    mem_l1s[rate].append(l1.item())
                     progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.test_dataloader)-1})...")
                 progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs})...")
 
     name = "rap-" + dateTime() + ".pkl"
     with open(os.path.join(trainer.args.save_dir, name), "wb") as f:
-        pickle.dump({"mem_recalls": mem_recalls, "mem_precision": mem_precisions}, f)
+        pickle.dump({"mem_recalls": mem_recalls, "mem_precisions": mem_precisions, "mem_l1s": mem_l1s}, f)
     drawMetric(mem_recalls, mem_precisions, trainer.args.save_dir)
 
 

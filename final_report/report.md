@@ -61,8 +61,16 @@ There're 2 points to note in this model:
 1. Every encoder follows not only the 'Conv-Act-Norm' paradigm, but also follows a SE-layer. Decoders are the same except for replacing the 'Conv-layer' with 'TransConv-layer'. Details parameters are in the picture.
 2. The generator use 'skip connection' technique which means directly concatenating one feature map with a very late feature map. 
 # Part4 Experiments
-1. 【具体的参数怎么设置、训练过程】【mys】
-2. Ablation Study【控制变量/对比实验】
+## 1. Training details
+We used the AdamW optimizer by default. Except the learning rates, the arguments of AdamW were set to the default setting. We trained the model in 3 stages.
+
+In 1st stage, we set both the learning rates of the generator and the discriminator to $1\times10^{-5}$ and trained the GAN for $20$ epochs. The generator was trained every $3$ steps and the discriminator was trained every step. And the $\mathrm{DiffLoss}$ loss of the generator was not scaled in this stage.
+
+In 2nd stage, we set the learning rate of the generator to $1\times10^{-3}$ and the learning rate of the discriminator to $1\times10^{-5}$ and trained the GAN for $20$ epochs. The generator was trained every $2$ steps and the discriminator was trained every step. In this stage, we magnified the weights of the non-empty voxels $100$ times.
+
+In 3rd stage, the parameter setting was the same as that in 2nd stage, except that we magnified the weights of the non-empty voxels $20$ times and trained the GAN for only $10$ epochs.
+
+1. Ablation Study【控制变量/对比实验】
 	1. 测试输入为空，输出的结果是什么【xly】
 		1. 【一个配图】
 	2. 测试只训练gan的G部分，是否可以恢复模型【wmq】
@@ -70,10 +78,26 @@ There're 2 points to note in this model:
 	3. 测试给gan的G部分的decoder投一个随机项链，是否可以生成结果【wmq】
 		1. 【一个配图】
 # Part5 results analysis
-1. 通过指标比较两组模型的效果（wmq交两个模型，mys分析效果）
-	1. ‘VAE vs GAN32 vs GAN64’
-		1. 【一个表格】
-2. title
+## 5.1. VAE vs GAN32 vs GAN64
+We used the VAE model as the baseline and analyzed the performance of GAN32 and GAN64.
+
+The VAE architecture was the same as the generator of GAN32. And it was trained with L1loss of the differences of the prediction and the ground-truth.
+
+We tested the three models on the test dataset, in which we randomly selected frags and combined them as the inputs. The random seed was fixed and thus it was guaranteed that the test data fed to the models were the same.
+
+We computed three metrics to analyze the performance of the models. Let $Y$ be the ground-truth and $P$ the prediction.
+1. L1loss, the average number of mis-predicted voxels.
+2. Recall, $\mathrm{Recall}=\frac{|P\cap Y|}{|Y|}$.
+3. Precision, $\mathrm{Precision}=\frac{|P\cap Y|}{|P|}$.
+
+
+| Model | L1loss | Average Recall | Average Precision |
+|:---:|:---:|:---:|:---:|
+| VAE | | | |
+| GAN32 | | | |
+| GAN64 | | | |
+
+1. title
 	1. 测试同一个成品，随着输入碎片的数量增加，输出模型的变化【xly】
 		1. 【一个表格+一个配图】
 # Part6 Conclusion【mys】

@@ -17,6 +17,12 @@ def gLossDiff(pred: torch.Tensor, real: torch.Tensor):
     return loss
 
 
+def metricL1(pred: torch.Tensor, real: torch.Tensor):
+    pred = pred > 0.5
+    real = real > 0.5
+    return torch.mean((pred != real).to(torch.float), dim=(1, 2, 3))
+
+
 def recallAndPrecision(pred: torch.Tensor, real: torch.Tensor):
     pred = pred > 0.5
     real = real > 0.5
