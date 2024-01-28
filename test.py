@@ -17,6 +17,21 @@ def gLossDiff(pred: torch.Tensor, real: torch.Tensor):
     return loss
 
 
+def metricL1(pred: torch.Tensor, real: torch.Tensor):
+    pred = pred > 0.5
+    real = real > 0.5
+    return torch.mean((pred != real).to(torch.float), dim=(1, 2, 3))
+
+
+def recallAndPrecision(pred: torch.Tensor, real: torch.Tensor):
+    pred = pred > 0.5
+    real = real > 0.5
+    total_overlap = torch.sum(pred & real, dim=(1, 2, 3))
+    total_pred = torch.sum(pred, dim=(1, 2, 3))
+    total_real = torch.sum(real, dim=(1, 2, 3))
+    return (total_overlap / total_real, total_overlap / total_pred)
+
+
 def test():
     # TODO
     # You can also implement this function in training procedure, but be sure to

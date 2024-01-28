@@ -27,12 +27,18 @@ from test import *
 from matplotlib import pyplot as plt
 from utils.visualize import plot_join, plot
 from utils.pyvox.models import Vox
+from test import recallAndPrecision
 
 def gradient_penalty(y_pred, voxel_blend):
     gradients = torch.autograd.grad(outputs=y_pred, inputs=voxel_blend, grad_outputs=torch.ones_like(y_pred), create_graph=True)[0]
     gradient_norm = gradients.norm(2, dim=1)
     penalty = torch.mean((gradient_norm - 1) ** 2) * 10
     return penalty 
+
+
+def dateTime():
+    return datetime.datetime.now().strftime("%y%m%d%H%M%S")
+
 
 class GAN_trainer:
     def __init__(self, args):
@@ -128,8 +134,8 @@ class GAN_trainer:
             path)
         print(f"Model Saved to {path} Successfully!")
 
-    def draw_loss(self, dir="drive/MyDrive/lossPics"):
-        pre_title = self.args.model_name + "-" + datetime.datetime.now().strftime("%y%m%d%H%M%S")
+    def draw_loss(self, dir="lossPics"):
+        pre_title = self.args.model_name + "-" + dateTime()
         plt.figure()
         plt.plot(self.G_loss_pred)
         plt.savefig(os.path.join(dir, f"{pre_title}-G_loss_pred.jpg"))
@@ -175,14 +181,46 @@ class GAN_trainer:
     def empty_input(self):
         if not os.path.exists("emptyInput"):
             os.makedirs("emptyInput")
-        frag = np.zeros((32,32,32))
-        frag = torch.from_numpy(frag)
-        for label in range(0, 11):
-            label = torch.tensor([label])
-            to_plot = self.G(frag.float(), label).reshape(32, 32, 32)
-            to_plot = torch.round(to_plot)
-            #print(to_plot)
-            plot(to_plot.detach(),os.path.join("emptyInput","label="+str(label)+".png"), False)
+        self.G.eval()
+        with torch.no_grad():
+            frag = np.zeros((32,32,32))
+            frag = torch.from_numpy(frag)
+            for label in range(0, 11):
+                label = torch.tensor([label])
+                to_plot = self.G(frag.float(), label).reshape(32, 32, 32)
+                to_plot = torch.round(to_plot)
+                #print(to_plot)
+                plot(to_plot,os.path.join("emptyInput","label="+str(label)+".png"), False)
+
+    def test_one_voxel(self, idx, show_frag=True):
+        if not os.path.exists("oneVoxelPics"):
+            os.makedirs("oneVoxelPics")
+        train_dataset = FragmentDataset(self.args.test_vox_path, "test", dim_size=self.args.hidden_dim)
+        self.G.eval()
+        with torch.no_grad():
+            for cnt in range(1,15):
+                frag, gt, frag_id, label, path = train_dataset.__getitem_with_frag_num__(idx, cnt)
+                if label == -1:
+                    break
+                gt = gt.reshape(32, 32, 32)
+                frag = torch.from_numpy(frag)
+                path = path[0]
+                pred = self.G(frag.float(), torch.tensor([label])).reshape(32, 32, 32)
+                recall, precision = recallAndPrecision(pred.reshape(-1,32,32,32), gt.reshape(-1,32,32,32))
+                plt.plot(cnt, recall, 'ro')
+                plt.plot(cnt, precision, 'bo')
+                if show_frag:
+                    to_plot = torch.round(pred) - frag.to('cpu').reshape(32, 32, 32)
+                    plot_join(to_plot, frag.to('cpu').reshape(32, 32, 32), os.path.join("oneVoxelPics", "show_frag"+str(cnt) + ".pred.png"), False)
+                else:
+                    to_plot = torch.round(pred)
+                    plot(to_plot, os.path.join("oneVoxelPics", str(cnt) + ".pred.png"), False)
+                plot(gt, os.path.join("oneVoxelPics", str(cnt) + ".real.png"), False)
+            plt.xlabel('frag_num')
+            plt.ylabel('recall/precision')
+            plt.title('Recall and Precision vs cnt')
+            plt.show()
+
 
 def train(trainer: GAN_trainer):
     # Training loop.
@@ -218,7 +256,7 @@ def train(trainer: GAN_trainer):
             
             progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), ({D_loss_fake:.2f},{D_loss_real:.2f},{D_loss_grad:.2f},{G_loss_pred:.2f},{G_loss_diff:.2f})...")
             
-            date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
+            date = dateTime()
             trainer.save_Model("GAN32" + str(epoch) + "-" + date + ".pt")
             trainer.draw_loss()
 
@@ -227,33 +265,80 @@ def train(trainer: GAN_trainer):
 
 def test(trainer: GAN_trainer):
     trainer.test(10, True)
-    
+ 
 
 def debug(trainer: GAN_trainer):
-    with Progress() as progress:
-        task1 = progress.add_task(f"[red]Epoch Training({0}/{trainer.args.epochs})...",total=trainer.args.epochs)
+    pass
 
-        for epoch in range(1, trainer.args.epochs + 1):
-            task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(trainer.train_dataloader)-1})...",total=len(trainer.train_dataloader)-1)
-
-            for step, (frags, voxes, frag_ids, labels, paths) in enumerate(trainer.train_dataloader):
-                trainer.args.global_step += 1
-                frags = frags.to(trainer.args.available_device)
-                voxes = voxes.to(trainer.args.available_device)
-                labels = labels.to(trainer.args.available_device)  # fixed: device bug
-                trainer.train_G(voxes,frags,labels)
-                G_loss_diff = float("inf") if len(trainer.G_loss_diff) == 0 else trainer.G_loss_diff[-1]
-                progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.train_dataloader)-1}), {G_loss_diff:.2f}...")
-
-            G_loss_diff = np.mean(trainer.G_loss_diff)
-            progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs}), {G_loss_diff:.2f}...")
-            date = datetime.datetime.now().strftime("%y%m%d%H%M%S")
-            trainer.save_Model("debug" + str(epoch) + "-" + date + ".pt")
-
-    print("Finished training!")
 
 def emptyDraw(trainer: GAN_trainer):
     trainer.empty_input()
+
+
+def drawMetric(recalls, precisions, save_dir):
+    date = dateTime()
+    plt.cla()
+    # Draw recalls
+    data = [(key, np.mean(value)) for key, value in recalls.items()]
+    data.sort()
+    name = "recall-" + date + ".png"
+    xs, ys = [], []
+    for key, value in data:
+        xs.append(key)
+        ys.append(value)
+    plt.plot(xs, ys)
+    plt.savefig(os.path.join(save_dir, name))
+    plt.cla()
+    # Draw precisions
+    data = [(key, np.mean(value)) for key, value in precisions.items()]
+    data.sort()
+    name = "precision-" + date + ".png"
+    xs, ys = [], []
+    for key, value in data:
+        xs.append(key)
+        ys.append(value)
+    plt.plot(xs, ys)
+    plt.savefig(os.path.join(save_dir, name))
+    plt.cla()
+
+    
+def metric(trainer: GAN_trainer):
+    assert trainer.args.batch_size == 1
+    import pickle
+    mem_recalls = {}
+    mem_precisions = {}
+    mem_l1s = {}
+    with torch.no_grad():
+        trainer.G.eval()
+        with Progress() as progress:
+            task1 = progress.add_task(f"[red]Epoch Training({0}/{trainer.args.epochs})...",total=trainer.args.epochs)
+            for epoch in range(1, trainer.args.epochs + 1):
+                task2 = progress.add_task(f"[green]Epoch {1} Stepping({0}/{len(trainer.train_dataloader)-1})...",total=len(trainer.test_dataloader)-1)
+                for step, (frag, real, frag_id, label, path) in enumerate(trainer.test_dataloader):
+                    frag = frag.to(trainer.args.available_device)
+                    real = real.to(trainer.args.available_device)
+                    label = label.to(trainer.args.available_device)
+                    pred = trainer.G(frag, label)
+                    recall, precision = recallAndPrecision(pred, real)
+                    l1 = metricL1(pred, real)
+                    num_frags = torch.sum(frag_id).item()
+                    total_frags = len(torch.unique(real))
+                    rate = num_frags / total_frags
+                    if rate not in mem_recalls:
+                        mem_recalls[rate] = []
+                        mem_precisions[rate] = []
+                        mem_l1s[rate] = []
+                    mem_recalls[rate].append(recall.item())
+                    mem_precisions[rate].append(precision.item())
+                    mem_l1s[rate].append(l1.item())
+                    progress.update(task2,advance=1,completed=step,description=f"[green]Epoch {epoch} Stepping({step}/{len(trainer.test_dataloader)-1})...")
+                progress.update(task1,completed=epoch,description=f"[red]Epoch Training({epoch}/{trainer.args.epochs})...")
+
+    name = "rap-" + dateTime() + ".pkl"
+    with open(os.path.join(trainer.args.save_dir, name), "wb") as f:
+        pickle.dump({"mem_recalls": mem_recalls, "mem_precisions": mem_precisions, "mem_l1s": mem_l1s}, f)
+    drawMetric(mem_recalls, mem_precisions, trainer.args.save_dir)
+
 
 def main():
     '''
@@ -313,6 +398,10 @@ def main():
         debug(trainer)
     elif args.mode == "empty":  
         emptyDraw(trainer)
+    elif args.mode == "metric":
+        metric(trainer)
+    elif args.mode == "oneVoxel":
+        trainer.test_one_voxel(15)
 
 
 if __name__ == "__main__":
@@ -352,12 +441,27 @@ python training.py \
     --batch_size 1 \
     --hidden_dim 32 \
     --mode test \
-    --load_path models/GAN3220-240122173034.pt
+    --load_path models/GAN3210-240123000527.pt
 python training.py --train_vox_path data\train --test_vox_path data\test --epochs 10 --batch_size 8 --hidden_dim 32
 """
 
 """
 python training.py \
     --mode empty \
+    --load_path models/GAN3210-240123000527.pt
+"""
+
+"""
+Draw the metrics:
+python training.py \
+    --mode metric \
+    --load_path models/GAN3210-240123000527.pt \
+    --batch_size 1 \
+    --hidden_dim 32 \
+    --save_dir testPics \
+    --epochs 5
+python training.py \
+    --mode oneVoxel \
+    --hidden_dim 32 \
     --load_path models/GAN3210-240123000527.pt
 """
