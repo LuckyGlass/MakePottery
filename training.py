@@ -27,6 +27,7 @@ from test import *
 from matplotlib import pyplot as plt
 from utils.visualize import plot_join, plot
 from utils.pyvox.models import Vox
+from test import recallAndPrecision
 
 def gradient_penalty(y_pred, voxel_blend):
     gradients = torch.autograd.grad(outputs=y_pred, inputs=voxel_blend, grad_outputs=torch.ones_like(y_pred), create_graph=True)[0]
@@ -191,7 +192,7 @@ class GAN_trainer:
                 #print(to_plot)
                 plot(to_plot,os.path.join("emptyInput","label="+str(label)+".png"), False)
 
-    def test_one_voxel(self, idx, show_frag=False):
+    def test_one_voxel(self, idx, show_frag=True):
         if not os.path.exists("oneVoxelPics"):
             os.makedirs("oneVoxelPics")
         train_dataset = FragmentDataset(self.args.test_vox_path, "test", dim_size=self.args.hidden_dim)
@@ -205,14 +206,20 @@ class GAN_trainer:
                 frag = torch.from_numpy(frag)
                 path = path[0]
                 pred = self.G(frag.float(), torch.tensor([label])).reshape(32, 32, 32)
+                recall, precision = recallAndPrecision(pred.reshape(-1,32,32,32), gt.reshape(-1,32,32,32))
+                plt.plot(cnt, recall, 'ro')
+                plt.plot(cnt, precision, 'bo')
                 if show_frag:
                     to_plot = torch.round(pred) - frag.to('cpu').reshape(32, 32, 32)
-                    plot_join(to_plot, frag.to('cpu').reshape(32, 32, 32), os.path.join("oneVoxelPics", str(cnt) + ".pred.png"), False)
+                    plot_join(to_plot, frag.to('cpu').reshape(32, 32, 32), os.path.join("oneVoxelPics", "show_frag"+str(cnt) + ".pred.png"), False)
                 else:
                     to_plot = torch.round(pred)
                     plot(to_plot, os.path.join("oneVoxelPics", str(cnt) + ".pred.png"), False)
                 plot(gt, os.path.join("oneVoxelPics", str(cnt) + ".real.png"), False)
-            
+            plt.xlabel('frag_num')
+            plt.ylabel('recall/precision')
+            plt.title('Recall and Precision vs cnt')
+            plt.show()
 
 
 def train(trainer: GAN_trainer):
